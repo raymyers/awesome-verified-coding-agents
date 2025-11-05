@@ -1,6 +1,6 @@
 # Verified Coding Agents
 
-"Verified coding agents" is a term I'm coining to describe the pursuit of bringing mathematical certainty—via the field of formal verification—to the valuable but highly chaotic space of AI coding agents. Large language models give these agents impressive capabilities, but also some rather chaotic characteristics. Verification is meant as a counterbalance.
+"Verified coding agents" is a term I'm coining to describe the pursuit of bringing mathematical certainty to the valuable but highly chaotic space of AI coding agents. Large Language Models (LLMs) give these agents impressive capabilities, but also some rather chaotic characteristics. Formal Verification is meant as a counterbalance.
 
 ## What is a Coding Agent?
 
@@ -14,7 +14,7 @@ A coding agent is an AI-based tool that takes requests in natural language and p
 
 ## What is Formal Verification?
 
-Formal verification is reasoning about programs with mathematical rigor by proving the implementation matches some specified behavior. Formal specification is a related practice focused on verifying the design rather than the implementation itself.
+Formal verification is reasoning about programs with mathematical rigor by proving the implementation matches some specified behavior. Formal Specification is a related practice focused on verifying the design rather than the implementation itself.
 
 ## What is a Verified Coding Agent?
 
@@ -25,7 +25,7 @@ A verified coding agent combines coding agents with formal verification in one o
 
 ## Why?
 
-To demonstrate ways of using coding agents with higher assurance, inspiring future work on the risk-bottleneck of practical AI coding. If we can show concrete approaches that work, we can start closing the trust gap.
+To demonstrate ways of using coding agents with high assurance, inspiring future work on the risk-bottleneck of practical AI coding. If we can show concrete approaches that work, we can start closing the trust gap.
 
 ## Approach 1: Agents Generating Verified Code
 
@@ -33,33 +33,33 @@ To demonstrate ways of using coding agents with higher assurance, inspiring futu
 
 Regardless of what kind of agent we have, if we happen to be using it to generate code in a verifiable language, we could say we have a verified coding agent. Whatever the agent generates, we'll get assurances on the result—to whatever extent we understand the specs, we ought to be able to reason about what the code might do.
 
-You can use ChatGPT or your favorite coding agent to generate code in a provable language such as **Lean**, **ACL2**, **Dafny**, **Rocq** (formerly Coq), or **Isabelle**. These are some of the common ones.
+You can use ChatGPT or your favorite coding agent to generate code in a provable language such as **Lean**, **ACL2**, **Dafny**, **Rocq** , or **Isabelle**.
 
 ### The Adoption Barrier
 
-Here's the catch: verification-friendly languages tend to be pretty niche within computer science and software engineering as a whole. There are some domains where they've built sturdy bridges to use these arcane tools, but they're far from popular consumption.
+Here's the catch: verification-friendly languages tend to be pretty niche within computer science and software engineering as a whole. There are some domains with special they've built usable bridges to use these arcane tools, but they're far from popular consumption.
 
-If you want to create a verified coding agent in the sense of just generating verified code, you've got the task of convincing your target audience that they want to write in a verifiable language—or at least write code that can interface with one. This either means you're targeting fairly niche users, or you're going to try and build such a bridge yourself.
+Therefore, if you want to create a verified coding agent in the sense of just generating verified code, you've got the task of convincing your target audience that they want code in a verifiable language in the first place. This either means you're targeting fairly niche users, or you're going to try and interface with mainstream code by building a bridge yourself.
 
-**Dafny** is an example of an attempt at such a bridge. It compiles down to industrial languages like Python, C#, and Java. That's pretty interesting. There are also a number of attempts well along the way to create verifiable bridges to Rust. There's OCaml, which Rocq and some others will extract to. These allow an architecture of having a verified core in something a little more arcane, and then an interface to it—you're using this extracted prover code with your conventional industrial code around it, calling into the verified core.
+**Dafny** is an example of an attempt at such a bridge. It compiles down to industrial languages like Python, C#, and Java. There are also a number of attempts well along the way to create verifiable bridges to Rust. There's OCaml, which Rocq and others will extract to. These allow the architecture of a verified core in something more arcane, and then an interface to it - you're using this extracted prover code with your conventional industrial code around it.
 
 ### The Interface Problem
 
-I think that if you're targeting a wide audience, none of the existing solutions are quite there—even Dafny. While it may compile to Python, it doesn't compile to Python that's very convenient to interface with. The interfaces aren't well documented. You end up with things like... just to use a simple string or an integer, you're wrapping them in their custom verifiable types. It's not a very friendly experience right now.
+I think that if you're targeting a wide audience, none of the existing solutions are quite there, even Dafny. While it may compile to Python, it doesn't compile to code that's convenient to interface with. The project setup isn't well documented, and the types are weird. You end up these weird wrapper objects just to use a simple string or an integer. It's not a very friendly experience right now.
 
 ### Provable Python: A Bridge Idea
 
-You could build on existing solutions to make them more friendly, or you could take an approach like this: an idea I had recently was **Provable Python**.
+You could build on existing solutions to make them more friendly, or you could take an approach like a verifiable subsets. An idea I had recently was **Provable Python**.
 
-Suppose we define a semantics for a very restricted subset of Python and say that our prover is going to be able to speak that. You write in Provable Python, extract it to a prover language to make whatever verifications you want—but this is also plain Python. Someone who knows Python can look at it and understand it. They just may not understand what features they're allowed to use and not use.
+Suppose we define a semantics for a very restricted subset of Python and our prover is going to be able to speak that. You write in Provable Python, extract it to a prover language to make whatever verifications you want, but it also reads as plain Python. Someone who knows Python can look at it and understand it, they just may not understand what features they're allowed to use and not use.
 
-To make this maximally simple, it would be **purely functional**—no mutations, no side effects. Therefore we're restricting the architecture such that your verified core communicates entirely via input/output, with primitive types and maybe Pydantic models as the only ways it could interface. Purely functional, no side effects—but otherwise perfectly runnable Python code that you could also perform verification-related tasks on.
+To make this simple to verify, it would be **purely functional**: no mutations, no side effects. Therefore we're restricting the architecture such that your verified core communicates entirely via input/output, with primitive types and maybe Pydantic models as the only ways it could interface. Purely functional, no side effects, but otherwise perfectly runnable Python code the you could do proofs on.
 
 I think that would be pretty interesting.
 
 ### Specialized Agents for Verified Code
 
-Beyond just prompting standard agents, you could build agents made especially for verified code—agents that understand the idioms of proof assistants, can invoke tactics, and know how to structure proofs. Or agents that externalize reasoning to a prover, delegating verification tasks to specialized systems.
+Beyond just prompting standard agents, you could build agents made especially for verified development that understand the idioms of proof assistants, can invoke tactics, and know how to structure proofs. Or agents that externalize reasoning to a prover, delegating verification tasks to specialized systems.
 
 ## Approach 2: Agents with Verified Components
 
