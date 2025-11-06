@@ -25,7 +25,7 @@ A verified coding agent combines coding agents with formal verification in one o
 
 ## Why?
 
-To demonstrate ways of using coding agents with high assurance, inspiring future work on the risk-bottleneck of practical AI coding. If we can show concrete approaches that work, we can start closing the trust gap.
+To demonstrate ways of using coding agents with high assurance, inspiring future work on the risk-bottleneck of practical AI coding. If we can show concrete approaches that work, we can start closing the trust gap. See also the July video: ["Verified Coding Agents" on Craft vs Cruft](https://www.youtube.com/watch?v=7hRgK6G5aok)
 
 ## Approach 1: Agents Generating Verified Code
 
