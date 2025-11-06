@@ -2,6 +2,10 @@
 
 "Verified coding agents" is the pursuit of bringing elements of mathematical certainty to the valuable but highly chaotic space of AI coding agents. Large Language Models (LLMs) give these agents impressive capabilities, but also unpredictable characteristics. Formal Verification is meant as a counterbalance.
 
+## Why?
+
+To demonstrate ways of using coding agents with high assurance, inspiring future work on the risk-bottleneck of practical AI coding. If we can show concrete approaches that work, we can start closing the trust gap. See also the July video: ["Verified Coding Agents" on Craft vs Cruft](https://www.youtube.com/watch?v=7hRgK6G5aok)
+
 ## What is a Coding Agent?
 
 A coding agent is an AI-based tool that takes requests in natural language and performs multi-step software development tasks, using feedback from the environment as it goes. They're often implemented as an LLM chat-loop with tool use, where the tools are suited for coding tasks.
@@ -22,10 +26,6 @@ A verified coding agent combines coding agents with formal verification in one o
 
 1. **A coding agent that generates verified code**
 2. **A coding agent with some verified component**
-
-## Why?
-
-To demonstrate ways of using coding agents with high assurance, inspiring future work on the risk-bottleneck of practical AI coding. If we can show concrete approaches that work, we can start closing the trust gap. See also the July video: ["Verified Coding Agents" on Craft vs Cruft](https://www.youtube.com/watch?v=7hRgK6G5aok)
 
 ## Approach 1: Agents Generating Verified Code
 
