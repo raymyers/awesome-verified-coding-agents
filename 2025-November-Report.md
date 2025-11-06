@@ -1,6 +1,6 @@
-# Verified Coding Agents
+# Verified Coding Agents - November 2025 Report
 
-"Verified coding agents" is a term I'm coining to describe the pursuit of bringing mathematical certainty to the valuable but highly chaotic space of AI coding agents. Large Language Models (LLMs) give these agents impressive capabilities, but also some rather chaotic characteristics. Formal Verification is meant as a counterbalance.
+"Verified coding agents" is the pursuit of bringing elements of mathematical certainty to the valuable but highly chaotic space of AI coding agents. Large Language Models (LLMs) give these agents impressive capabilities, but also unpredictable characteristics. Formal Verification is meant as a counterbalance.
 
 ## What is a Coding Agent?
 
