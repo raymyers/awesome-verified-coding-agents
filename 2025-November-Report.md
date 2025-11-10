@@ -61,8 +61,6 @@ You could build on existing solutions to make them more friendly, or you could t
 
 Suppose we define a semantics for a very restricted subset of Python and our prover is going to be able to speak that. You write in Provable Python, extract it to a prover language to make whatever verifications you want, but it also reads as plain Python. Someone who knows Python can look at it and understand it, they just may not understand what features they're allowed to use and not use.
 
-To make this simple to verify, it would be **purely functional**: no mutations, no side effects. Therefore we're restricting the architecture such that your verified core communicates entirely via input/output, with primitive types and maybe Pydantic models as the only ways it could interface. Purely functional, no side effects, but otherwise perfectly runnable Python code the you could do proofs on.
-
 I think that would be pretty interesting.
 
 ### Specialized Agents for Verified Code
