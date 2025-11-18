@@ -2,7 +2,9 @@
 
 > Resources on AI coding agents using high assurance technniques such as Formal Verification.
 
-Formal Methods is a family of techniques applying mathematical rigor to software engineering. AI coding agents use Large Language Models with iteration and tool feedback to assist with a variety of development tasks, unlocking huge productivity gains *when they work*. By combining these techniques, we hope to enable the widespread creation of software that is highly reliable and maintainable.
+Formal Methods is a family of techniques applying mathematical rigor to software engineering. AI coding agents use Large Language Models with iteration and tool feedback to assist a variety of development tasks, unlocking huge productivity gains *when they work*.
+
+By combining these techniques, we hope to enable the widespread creation of software that is highly reliable and maintainable.
 
 ## Examples in production
 
@@ -19,5 +21,8 @@ To our knowledege this is the first use of Formal Verification in a coding agent
 * [AlphaGeometry](https://deepmind.google/discover/blog/alphageometry-an-olympiad-level-ai-system-for-geometry/): An Olympiad-level AI system for geometry
 * [The Fusion of Large Language Models and Formal Methods
 for Trustworthy AI Agents: A Roadmap](https://arxiv.org/abs/2412.06512), Yedi Zhang et al
+
+## Featured blogs
+* [Reliable Software in the LLM Era](https://quint-lang.org/posts/llm_era) by Gabriela Moreira of [Quint](https://quint-lang.org/posts/llm_era)
 
 Submit your suggestions as issues or [pull requests](https://github.com/raymyers/awesome-verified-coding-agents/pulls)!
