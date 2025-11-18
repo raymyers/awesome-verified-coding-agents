@@ -6,7 +6,7 @@ Formal Methods is a family of techniques applying mathematical rigor to software
 
 ## Examples in production
 
-Stakpak uses a [policy enforcer](https://stakpak.gitbook.io/docs/how-it-works/warden-guardrails) to restrict agent actions, which is built on the Cedar policy language. Cedar is [developed](https://arxiv.org/abs/2407.01688v1) using a formally verified reference implementation in Lean 4. That spec is then fuzz-tested for equivelence with te production Rust implementation.
+[Stakpak](https://stakpak.dev/) uses a [policy enforcer](https://stakpak.gitbook.io/docs/how-it-works/warden-guardrails) to restrict agent actions, which is built on the Cedar policy language. Cedar is [developed](https://arxiv.org/abs/2407.01688v1) using a formally verified reference implementation in Lean 4. That spec is then fuzz-tested for equivelence with te production Rust implementation.
 
 To our knowledege this is the first use of Formal Verification in a coding agent product. If you are aware of others, please use an issue or PR to submit them.
 
