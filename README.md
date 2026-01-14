@@ -25,4 +25,7 @@ for Trustworthy AI Agents: A Roadmap](https://arxiv.org/abs/2412.06512), Yedi Zh
 ## Featured blogs
 * [Reliable Software in the LLM Era](https://quint-lang.org/posts/llm_era) by Gabriela Moreira of [Quint](https://quint-lang.org/posts/llm_era)
 
+## Presentations
+* [ACL2 for Trustworthy Vibe Coding](https://github.com/wiki3-ai/verified-agent/blob/main/slides.ipynb) by Jim White, Bay Area Lisp and Scheme User Group
+
 Submit your suggestions as issues or [pull requests](https://github.com/raymyers/awesome-verified-coding-agents/pulls)!
