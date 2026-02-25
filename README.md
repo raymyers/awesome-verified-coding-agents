@@ -121,7 +121,11 @@ Each tool an agent uses (file editors, refactoring operations, search) can be in
 
 ## Examples
 
-See [`examples/`](./examples/) for working code — verified insertion sort in Lean 4 and ACL2, generated with agent assistance.
+See [`examples/`](./examples/) for guidance on what kinds of examples are welcome and how to contribute one.
+
+## More Links
+
+See [MORE_LINKS.md](./MORE_LINKS.md) for an extended collection of resources organized by topic: agent frameworks, benchmarks, MCP and protocols, formal methods applications, models, and software craft.
 
 ## FAQ
 
