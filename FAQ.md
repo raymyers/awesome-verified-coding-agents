@@ -5,7 +5,7 @@
 A verified coding agent is an AI coding agent that incorporates formal verification in one of two ways:
 
 1. It generates verified code — code proven correct against a formal specification
-2. The agent code itself is verified, has some verified component — such as a verified permission system or verified individual tools
+2. The agent code itself is verified, or has a verified component such as a verified permission system or individual tools
 
 See the [README](./README.md) for a full breakdown of both approaches.
 
@@ -25,7 +25,7 @@ Approach 1 (generating verified code) is advancing rapidly. As of late 2025, SOT
 
 There's no single answer — it depends on your domain and team:
 
-- **Lean 4**: Strong momentum, the Mathlib library, and the best LLM tooling as of 2025. A strong default for new projects, especially mathematics-adjacent work.
+- **Lean 4**: Strong momentum, the Mathlib library, and the most LLM tooling as of 2025. A strong default for new projects, especially mathematics-adjacent work.
 - **ACL2**: Industrial track record, particularly for hardware and systems verification. Lisp-based with powerful automation; well-suited for teams already in that ecosystem.
 - **Quint**: Readable TLA+-style specs with good tooling. Particularly well-suited for distributed systems and protocol design.
 - **Dafny**: Familiar imperative syntax; compiles to mainstream languages like Python and C#. Useful when you want a verified core alongside conventional code.
@@ -33,7 +33,7 @@ There's no single answer — it depends on your domain and team:
 
 ## What have early experiments taught us?
 
-- Standard coding agents can already produce working Lean and ACL2 code for well-understood problems (see [`examples/`](./examples/))
+- Standard coding agents can already produce working Lean and ACL2 code for well-understood problems.
 - The feedback loop between the LLM and the prover — via MCP or similar tooling — is key to getting proofs to go through
 - Small, well-scoped problems work much better than large ones; agents benefit from tight iteration cycles
 - Tactic selection remains the hardest part for agents; domain-specific tooling (LeanCopilot, LLMLean) meaningfully helps
