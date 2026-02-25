@@ -43,6 +43,13 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [seL4: formally verified microkernel](https://github.com/seL4/seL4)
 - [No-code platform by Adam Chlipala (formal verification researcher) incorporating verified components](https://nectry.com/)
 - [Autoformalization experiments and tooling](https://github.com/dataopsnick/autoformalization)
+- [Cedar policy language homepage](https://www.cedarpolicy.com/en)
+- [acl2-docker: Docker image for ACL2](https://github.com/mister-walter/acl2-docker)
+- [lean4code: LeanDojo VS Code editor for Lean](https://github.com/lean-dojo/lean4code)
+- [Formal Foundry: formal methods for AI systems](https://formalfoundry.ai/)
+- [MS Power Platform CAT Kit: plan validation for agent tool use](https://devblogs.microsoft.com/powerplatform/plan-validation-cat-kit/)
+- [Flaw in Gemini CLI allowed code execution via prompt injection](https://arstechnica.com/security/2025/07/flaw-in-gemini-cli-coding-tool-allowed-hackers-to-run-nasty-commands-on-user-devices/)
+- [Code execution through email: exploiting Claude via MCP](https://www.pynt.io/blog/llm-security-blogs/code-execution-through-email-how-i-used-claude-mcp-to-hack-itself)
 
 ### Autoformalization and Theorem Proving Research
 
@@ -56,6 +63,9 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [Lean Zulip: MCP Tools for LLMs and Agentic Mathematics](https://leanprover.zulipchat.com/#narrow/channel/219941-Machine-Learning-for-Theorem-Proving/topic/MCP.20Tools.20for.20LLMs.20and.20Agentic.20Mathematics)
 - [LLM Post-Training: A Deep Dive into Reasoning Large Language Models](https://arxiv.org/pdf/2502.21321)
 - [RL's Razor: Why Online Reinforcement Learning Forgets Less](https://arxiv.org/abs/2509.04259)
+- [LLMLift: verifying LLM-generated code via lifting to proof assistants](https://arxiv.org/abs/2406.03003)
+- [Coq used to resolve the fifth Busy Beaver — formal methods landmark](https://www.quantamagazine.org/amateur-mathematicians-find-fifth-busy-beaver-turing-machine-20240702/)
+- [The Little Prover: introduction to inductive proofs via J-Bob](https://the-little-prover.github.io/)
 
 ### Static Analysis and Code Intelligence
 
@@ -65,12 +75,16 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [LLMSAN: LLM-based static analysis for security](https://github.com/chengpeng-wang/LLMSAN)
 - [Static analysis to guardrail coding agents without executing code](https://arxiv.org/html/2410.09117v1)
 - [Multi-SWE-bench: multilingual software engineering benchmark](https://arxiv.org/abs/2504.02605)
+- [Fuzzing Book: extracting dynamic invariants from executions](https://www.fuzzingbook.org/html/DynamicInvariants)
+- [KLEE: symbolic execution engine for finding bugs in C programs](https://klee-se.org/)
+- [Space and Time Proof of SQL: ZK proof of SQL query execution](https://github.com/spaceandtimelabs/sxt-proof-of-sql)
 
 ## Agentic Software Craft
 
 ### Coding Agents
 
 - [OpenHands: open-source coding agent platform](https://github.com/All-Hands-AI/OpenHands)
+- [OpenHands CLI: AI-powered development in your terminal](https://www.all-hands.dev/blog/the-openhands-cli-ai-powered-development-in-your-terminal)
 - [OpenHands: SOTA on SWE-bench with inference-time scaling and critic model](https://www.all-hands.dev/blog/sota-on-swe-bench-verified-with-inference-time-scaling-and-critic-model)
 - [OpenHands Index: cross-functional agent evaluation](https://openhands.dev/blog/openhands-index)
 - [Aider: AI pair programming in the terminal](https://github.com/Aider-AI/aider)
@@ -90,6 +104,7 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [Meta Coral: collaborative reasoning via consensus between adversarial agents](https://github.com/facebookresearch/collaborative-reasoner)
 - [Context7: MCP context service for coding agents](https://github.com/upstash/context7)
 - [The Claude Code workflow you can copy](https://medium.com/@chrisdunlop_37984/the-claude-code-workflow-you-can-copy-6265009df76d?sk=afa02989b227ebedb156c546971ea198)
+- [OpenManus: open agent framework from FoundationAgents](https://github.com/FoundationAgents/OpenManus)
 
 ### Agent Frameworks and Patterns
 
@@ -151,6 +166,9 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [ACL2 books in semantic web form — number theory](https://jimwhite.github.io/acl2/books/kestrel/number-theory/defprime.html)
 - [Adenine: semantic web programming language](https://www.ifcx.org/wiki/Adenine.html)
 - [Adenine GitHub repo](https://github.com/jimwhite/adenine)
+- [Rosette: solver-aided programming language built on Racket](https://docs.racket-lang.org/rosette-guide/index.html)
+- [Python interactive theorem proving — Philip Zucker](https://www.philipzucker.com/python-itp/)
+- [Frama-C: framework for static analysis and verification of C programs](https://frama-c.com/)
 
 ### Applications and Research
 
@@ -163,6 +181,11 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [Future of Coding podcast: Beyond Syntax — visual and structural editors](https://futureofcoding.org/episodes/073)
 - [VPRI STEPS: 100x code reduction using scoped DSLs](https://web.archive.org/web/20140108193416/http://www.vpri.org/pdf/tr2011004_steps11.pdf)
 - [Exo 2: user-schedulable DSLs for high-performance computing](https://news.mit.edu/2025/high-performance-computing-with-much-less-code-0313)
+- [OptiTrust: interactive framework for source-to-source transformations](https://www.chargueraud.org/research/2022/optitrust/optitrust.pdf)
+- [KLEE: symbolic execution paper — USENIX OSDI 2008](https://www.usenix.org/legacy/event/osdi08/tech/full_papers/cadar/cadar.pdf)
+- [DARPA Translating All C to Rust (TRACTOR) program page](https://www.darpa.mil/research/programs/translating-all-c-to-rust)
+- [Compiler verification with ACL2 — formal methods for compilers](https://www.ssw.uni-linz.ac.at/General/Staff/TW/FormCompilerVerificationACL2.pdf)
+- [Cosette: automated SQL query equivalence verification](https://cosette.cs.washington.edu/)
 
 ## Misc AI
 
