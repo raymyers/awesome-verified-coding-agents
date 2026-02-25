@@ -9,8 +9,9 @@ Good candidates for a direct PR:
 - Adding a project, paper, talk, or blog post to an existing section
 - Fixing a typo or broken link
 - Improving a one-line description
+- Adding an example to [`examples/`](./examples/)
 
-Keep entries concise: a name, link, and one-line description is enough. Place new entries in the most relevant existing section.
+Keep entries concise: a name, link, and one-line description is enough. Place new entries in the most relevant existing section. For examples, follow the guidance in [`examples/README.md`](./examples/README.md) — include enough detail to reproduce the result, and always note the model version used.
 
 ## Suggesting new sections or structural changes — open an Issue
 

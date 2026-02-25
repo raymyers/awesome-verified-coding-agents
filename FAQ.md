@@ -5,7 +5,7 @@
 A verified coding agent is an AI coding agent that incorporates formal verification in one of two ways:
 
 1. It generates verified code — code proven correct against a formal specification
-2. It has some verified component — such as a verified permission system or verified individual tools
+2. The agent code itself is verified, has some verified component — such as a verified permission system or verified individual tools
 
 See the [README](./README.md) for a full breakdown of both approaches.
 
