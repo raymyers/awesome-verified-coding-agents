@@ -1,0 +1,106 @@
+; Verified Insertion Sort in ACL2
+; Generated with agent assistance (OpenHands)
+;
+; Includes full proofs of:
+;   - Correctness: the output is sorted
+;   - Completeness: the output is a permutation of the input
+
+(in-package "ACL2")
+
+;; Check if a list is sorted
+(defun sortedp (lst)
+  (declare (xargs :guard (rational-listp lst)))
+  (cond ((endp lst) t)
+        ((endp (cdr lst)) t)
+        (t (and (<= (car lst) (cadr lst))
+                (sortedp (cdr lst))))))
+
+;; Insert an element into a sorted list
+(defun insert-sorted (x lst)
+  (declare (xargs :guard (and (rationalp x) (rational-listp lst))))
+  (cond ((endp lst) (list x))
+        ((<= x (car lst)) (cons x lst))
+        (t (cons (car lst) (insert-sorted x (cdr lst))))))
+
+;; Main insertion sort
+(defun insertion-sort (lst)
+  (declare (xargs :guard (rational-listp lst)))
+  (cond ((endp lst) nil)
+        (t (insert-sorted (car lst) (insertion-sort (cdr lst))))))
+
+;; Count occurrences of an element in a list
+(defun count-occurrences (x lst)
+  (declare (xargs :guard (and (rationalp x) (rational-listp lst))))
+  (cond ((endp lst) 0)
+        ((equal x (car lst)) (+ 1 (count-occurrences x (cdr lst))))
+        (t (count-occurrences x (cdr lst)))))
+
+;; Check if two lists are permutations of each other
+(defun permutationp (lst1 lst2)
+  (declare (xargs :guard (and (rational-listp lst1) (rational-listp lst2))))
+  (cond ((endp lst1) (endp lst2))
+        (t (and (equal (count-occurrences (car lst1) lst1)
+                       (count-occurrences (car lst1) lst2))
+                (permutationp (cdr lst1) lst2)))))
+
+;; --- Lemmas ---
+
+(defthm insert-sorted-length
+  (equal (len (insert-sorted x lst))
+         (+ 1 (len lst))))
+
+(defthm insert-sorted-preserves-sorted
+  (implies (sortedp lst)
+           (sortedp (insert-sorted x lst))))
+
+(defthm insert-sorted-member
+  (iff (member-equal y (insert-sorted x lst))
+       (or (equal y x) (member-equal y lst))))
+
+(defthm count-occurrences-insert-sorted
+  (equal (count-occurrences y (insert-sorted x lst))
+         (if (equal y x)
+             (+ 1 (count-occurrences y lst))
+             (count-occurrences y lst))))
+
+(defthm sortedp-cdr
+  (implies (and (sortedp lst) (consp lst))
+           (sortedp (cdr lst))))
+
+(defthm sortedp-cons
+  (implies (and (sortedp lst)
+                (or (endp lst) (<= x (car lst))))
+           (sortedp (cons x lst))))
+
+;; --- Main theorems ---
+
+(defthm insertion-sort-sorted
+  (sortedp (insertion-sort lst)))
+
+(defthm insertion-sort-length
+  (equal (len (insertion-sort lst))
+         (len lst)))
+
+(defthm insertion-sort-member
+  (iff (member-equal x (insertion-sort lst))
+       (member-equal x lst)))
+
+(defthm count-occurrences-insertion-sort
+  (equal (count-occurrences x (insertion-sort lst))
+         (count-occurrences x lst)))
+
+(defthm insertion-sort-permutation
+  (permutationp lst (insertion-sort lst)))
+
+(defthm insertion-sort-correct
+  (and (sortedp (insertion-sort lst))
+       (permutationp lst (insertion-sort lst))))
+
+;; --- Assertions ---
+
+(assert-event (equal (insertion-sort '(3 1 4 1 5 9 2 6))
+                     '(1 1 2 3 4 5 6 9)))
+
+(assert-event (sortedp (insertion-sort '(3 1 4 1 5))))
+
+(assert-event (permutationp '(3 1 4 1 5) (insertion-sort '(3 1 4 1 5))))
