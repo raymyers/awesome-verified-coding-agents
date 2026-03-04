@@ -1,0 +1,39 @@
+name: Cleanup .pr directory on merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Remove .pr directory if present
+        run: |
+          if [ -d ".pr" ]; then
+            rm -rf .pr
+            echo "REMOVED=true" >> "$GITHUB_ENV"
+          else
+            echo "REMOVED=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Commit and push removal
+        if: env.REMOVED == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: remove .pr directory after PR merge"
+          git push
