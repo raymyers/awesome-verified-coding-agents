@@ -50,6 +50,8 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [MS Power Platform CAT Kit: plan validation for agent tool use](https://devblogs.microsoft.com/powerplatform/plan-validation-cat-kit/)
 - [Flaw in Gemini CLI allowed code execution via prompt injection](https://arstechnica.com/security/2025/07/flaw-in-gemini-cli-coding-tool-allowed-hackers-to-run-nasty-commands-on-user-devices/)
 - [Code execution through email: exploiting Claude via MCP](https://www.pynt.io/blog/llm-security-blogs/code-execution-through-email-how-i-used-claude-mcp-to-hack-itself)
+- [quint-llm-kit: ready-to-go Docker image for using Claude Code with Quint](https://github.com/informalsystems/quint-llm-kit)
+- [ESBMC agent-marketplace: formal verification for Claude Code — C, C++, Python, Solidity, Java/Kotlin via ESBMC bounded model checker](https://github.com/esbmc/agent-marketplace)
 
 ### Autoformalization and Theorem Proving Research
 
@@ -66,6 +68,7 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [LLMLift: verifying LLM-generated code via lifting to proof assistants](https://arxiv.org/abs/2406.03003)
 - [Coq used to resolve the fifth Busy Beaver — formal methods landmark](https://www.quantamagazine.org/amateur-mathematicians-find-fifth-busy-beaver-turing-machine-20240702/)
 - [The Little Prover: introduction to inductive proofs via J-Bob](https://the-little-prover.github.io/)
+- [Intent Formalization Survey — RiSE Group: survey of intent formalization approaches by MSR; instructive introduction to verification for those newer to the field](https://risemsr.github.io/blog/2026-03-05-shuvendu-intent-formalization/)
 
 ### Static Analysis and Code Intelligence
 
