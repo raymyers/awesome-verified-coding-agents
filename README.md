@@ -87,14 +87,16 @@ Each tool an agent uses (file editors, refactoring operations, search) can be in
 
 | Project | Description |
 |---|---|
+| 🌟 [numina-lean-agent](https://github.com/project-numina/numina-lean-agent) | Agentic Lean proof generation |
+| 🌟 [quint-llm-kit](https://github.com/informalsystems/quint-llm-kit) | Ready-to-go Docker image for using Claude Code with Quint |
 | [LeanCopilot](https://github.com/lean-dojo/LeanCopilot) | LLMs as copilots for theorem proving in Lean |
 | [LeanTool](https://github.com/GasStationManager/LeanTool) | MCP server giving LLMs feedback from Lean |
 | [Provably Correct Vibecoding](https://github.com/GasStationManager/ProvablyCorrectVibeCoding) | Wraps LeanTool for agent-assisted proof development |
-| [numina-lean-agent](https://github.com/project-numina/numina-lean-agent) | Agentic Lean proof generation |
 | [LLMLean](https://github.com/cmu-l3/llmlean) | LLM-powered tactic suggestions in Lean |
 | [LeanAide](https://github.com/siddhartha-gadgil/LeanAide) | AI assistance for Lean development |
 | [ACL2 Jupyter](https://github.com/jimwhite/acl2-jupyter) | ACL2 in Jupyter notebooks |
 | [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent) | Minimal coding agent (~100 lines); tractable target for verification |
+| [ESBMC agent-marketplace](https://github.com/esbmc/agent-marketplace) | Formal verification for Claude Code: bugs, memory safety, and undefined behavior in C, C++, Python, Solidity, Java/Kotlin via ESBMC bounded model checker |
 
 ---
 
@@ -106,6 +108,7 @@ Each tool an agent uses (file editors, refactoring operations, search) can be in
 | [Universalis](https://dl.acm.org/doi/pdf/10.1145/3746223) | AI-first program synthesis framework |
 | [Kimina-Prover Preview](https://github.com/MoonshotAI/Kimina-Prover-Preview) | Large formal reasoning models with reinforcement learning |
 | [AlphaGeometry](https://deepmind.google/discover/blog/alphageometry-an-olympiad-level-ai-system-for-geometry/) | Olympiad-level AI system for geometry |
+| [Intent Formalization Survey — RiSE Group](https://risemsr.github.io/blog/2026-03-05-shuvendu-intent-formalization/) | Survey of intent formalization approaches by MSR's RiSE group; instructive introduction to verification for those newer to the field |
 
 ---
 
