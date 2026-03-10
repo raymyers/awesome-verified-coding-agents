@@ -1,0 +1,20 @@
+# Dafny compiled output directories
+*-py/
+*-cs/
+*-java/
+*-js/
+*-go/
+
+# Dafny build artifacts
+*.doo
+*.dll
+
+# Files created by examples
+output.txt
+bytes.bin
+test.txt
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
