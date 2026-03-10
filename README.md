@@ -89,12 +89,12 @@ Each tool an agent uses (file editors, refactoring operations, search) can be in
 |---|---|
 | 🌟 [numina-lean-agent](https://github.com/project-numina/numina-lean-agent) | Agentic Lean proof generation |
 | 🌟 [quint-llm-kit](https://github.com/informalsystems/quint-llm-kit) | Ready-to-go Docker image for using Claude Code with Quint |
+| [ACL2 Jupyter](https://github.com/jimwhite/acl2-jupyter) | ACL2 in Jupyter notebooks |
 | [LeanCopilot](https://github.com/lean-dojo/LeanCopilot) | LLMs as copilots for theorem proving in Lean |
 | [LeanTool](https://github.com/GasStationManager/LeanTool) | MCP server giving LLMs feedback from Lean |
 | [Provably Correct Vibecoding](https://github.com/GasStationManager/ProvablyCorrectVibeCoding) | Wraps LeanTool for agent-assisted proof development |
 | [LLMLean](https://github.com/cmu-l3/llmlean) | LLM-powered tactic suggestions in Lean |
 | [LeanAide](https://github.com/siddhartha-gadgil/LeanAide) | AI assistance for Lean development |
-| [ACL2 Jupyter](https://github.com/jimwhite/acl2-jupyter) | ACL2 in Jupyter notebooks |
 | [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent) | Minimal coding agent (~100 lines); tractable target for verification |
 | [ESBMC agent-marketplace](https://github.com/esbmc/agent-marketplace) | Formal verification for Claude Code: bugs, memory safety, and undefined behavior in C, C++, Python, Solidity, Java/Kotlin via ESBMC bounded model checker |
 
