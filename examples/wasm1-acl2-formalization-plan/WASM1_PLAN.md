@@ -13,6 +13,20 @@
 > **Existing skeleton**: [Kestrel WASM books](https://github.com/acl2/acl2/tree/master/books/kestrel/wasm)
 > (execution.lisp, parse-binary.lisp, add-proof.lisp)
 
+### Current Status (M0–M4 COMPLETE)
+
+| Milestone | Status | Instructions | Tests | Key Capability |
+|-----------|--------|-------------|-------|----------------|
+| M0: Bootstrap | ✅ | — | — | ACL2 builds, certifies |
+| M1: i32 + Variables | ✅ | 35 | 20 | Arithmetic, bitwise, comparison, parametric |
+| M2: Control Flow | ✅ | 8 | 10 | block, loop, if, br/br_if/br_table, return |
+| M3: Functions | ✅ | 1 | 8 | call, recursive factorial(5)=120, fibonacci(7)=13 |
+| M4: Memory | ✅ | 4 | 10 | i32.load/store, memory.size/grow, LE encoding |
+| **Total** | | **48 instrs** | **48 tests** | |
+| M5–M8 | todo | | | i64, tables, globals, proofs |
+
+**execution.lisp**: 1493 lines, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+
 ---
 
 ## Milestone 0: Environment Bootstrap (Prerequisite) ✅ COMPLETE

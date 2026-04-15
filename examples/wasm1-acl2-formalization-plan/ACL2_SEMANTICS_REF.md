@@ -135,22 +135,28 @@ frame = { LOCALS val*, MODULE moduleinst }
 admininstr = instr | CALL_ADDR funcaddr | LABEL_ n {instr*} admininstr* | FRAME_ n {frame} admininstr* | TRAP
 ```
 
-**Existing ACL2** (execution.lisp):
+**Current ACL2** (execution.lisp, M0–M4 complete):
 ```lisp
-(defaggregate state   ((store storep) (call-stack call-stackp+consp)))
-(defaggregate frame   ((return-arity natp) (locals val-listp) (operand-stack operand-stackp) (instrs instr-listp)))
+(defaggregate state   ((store storep)         ; list of funcinst
+                       (call-stack call-stackp+consp)
+                       (memory byte-listp)))   ; flat byte list (M4)
+(defaggregate frame   ((return-arity natp)
+                       (locals val-listp)
+                       (operand-stack operand-stackp)
+                       (instrs true-listp)     ; relaxed from instr-listp for nested control
+                       (label-stack true-listp))) ; (M2) stack of (arity . continuation)
+(defaggregate funcinst ((param-count natp) (local-count natp)
+                        (return-arity natp) (body true-listp))) ; (M3)
+;; storep = funcinst-listp (list indexed by function index)
 ;; call-stack = list of frames (implicit FRAME_ nesting)
-;; No LABEL_ handling yet — blocks/loops unimplemented
+;; label-stack entries = (arity . continuation-instrs) pushed by block/loop
 ```
 
-**Key design decision**: The existing skeleton models execution as a list of
-instructions-to-execute per frame with an explicit call stack, rather than
-SpecTec's admin-instruction stack with nested LABEL_ and FRAME_ contexts.
-
-**For blocks/loops**: Need to extend the frame or add a label stack. Options:
-1. **Add label-stack to frame**: Each frame gets a stack of `(arity . continuation-instrs)` pairs. `br N` pops N labels.
-2. **Flatten to admin instructions**: More faithful to spec but harder to prove things about.
-3. **Hybrid**: Keep instruction pointer + label stack (recommended — matches existing style).
+**Design decisions made**:
+1. **Label stack in frame** (not admin instructions) — matches existing Kestrel style
+2. **Flat byte list for memory** — simple, correct for i32 load/store
+3. **Store = list of funcinst** — indexed by position, no moduleinst yet
+4. **(:done state) return** — when last frame completes, run returns `(:done state)` instead of continuing
 
 ### 2.3 Value Types
 
@@ -515,7 +521,46 @@ The parser is mostly complete; the execution engine is what needs extension.
 
 ---
 
-## 10. Key Decisions Log
+## 10. Implementation Notes (M5–M8 Guidance)
+
+### M5: i64 + Conversions
+- Mirror i32 instructions with 64-bit BV operations: `(bvplus 64 x y)`, etc.
+- Add `i64-valp`, `make-i64-val`, `farg1` for i64
+- i64 values: `(:i64.const n)` where `(unsigned-byte-p 64 n)`
+- Conversion ops use `bvchop`, `bvsx` from kestrel/bv
+- Estimated: ~200 lines of execute-i64.* functions, following i32 pattern exactly
+
+### M6: Tables + call_indirect
+- Add `tableinst` aggregate: `(list of funcaddr-or-nil)`
+- Store becomes: `(list funcinst) + table + memory`
+- `call_indirect`: pop index, lookup in table, type-check, call
+- Need type signatures in funcinst (currently only param-count/return-arity)
+
+### M7: Full Module Instantiation + Globals
+- Add `globalinst` aggregate: `(mutability, value)`
+- `global.get`, `global.set` instructions
+- Module instantiation: imports/exports, start function
+- This is the biggest remaining structural change
+
+### M8: Proofs
+- Restore `verify-guards` (currently nil for most functions)
+- Re-enable `statep-of-execute-instr` theorem
+- Add `defopeners` for new instructions (block, loop, if, br, call)
+- Prove factorial correctness symbolically (extending add-proof.lisp pattern)
+
+### Pattern for adding new instructions
+```lisp
+;; 1. Add to instrp recognizer
+;; 2. Write execute-* function with :verify-guards nil
+;; 3. Add dispatch case in execute-instr
+;; 4. Write assert-event test
+;; 5. Re-certify
+;; 6. (Later) Add guard verification and theorems
+```
+
+---
+
+## 11. Key Decisions Log
 
 | Decision | Choice | Rationale |
 |---|---|---|
