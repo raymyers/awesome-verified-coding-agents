@@ -48,7 +48,8 @@
                                                   :locals ,locals
                                                   :operand-stack (empty-operand-stack)
                                                   :instrs ,instrs
-                                                  :label-stack nil)))))
+                                                  :label-stack nil))
+                    :memory nil)))
 
 ;; Extract result from state or (:done state)
 (defun get-result (r)

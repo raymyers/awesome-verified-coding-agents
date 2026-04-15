@@ -6,22 +6,34 @@
 ;; Helper: run a single-frame program with given locals
 (defmacro run-wasm (steps locals instrs)
   `(run ,steps
-        (make-state :store :fake
+        (make-state :store nil
                     :call-stack (list (make-frame :return-arity 1
                                                   :locals ,locals
                                                   :operand-stack (empty-operand-stack)
-                                                  :instrs ,instrs)
+                                                  :instrs ,instrs
+                                                  :label-stack nil)
                                       (make-frame :return-arity 0
                                                   :locals nil
                                                   :operand-stack (empty-operand-stack)
-                                                  :instrs nil)))))
+                                                  :instrs nil
+                                                  :label-stack nil))
+                    :memory nil)))
+
+(defun get-result (r)
+  (declare (xargs :guard t :verify-guards nil))
+  (if (and (consp r) (eq :done (first r)))
+      (let* ((st (second r))
+             (cs (state->call-stack st))
+             (f (car cs)))
+        (top-operand (frame->operand-stack f)))
+    (if (statep r)
+        (top-operand (current-operand-stack r))
+      r)))
 
 (defmacro check-result (steps locals instrs expected)
   `(assert-event
-    (let ((result (run-wasm ,steps ,locals ,instrs)))
-      (and (statep result)
-           (equal (top-operand (current-operand-stack result))
-                  ,expected)))))
+    (equal (get-result (run-wasm ,steps ,locals ,instrs))
+           ,expected)))
 
 ;; Test 1: add(3,4) = 7
 (check-result 4 (list (make-i32-val 3) (make-i32-val 4))

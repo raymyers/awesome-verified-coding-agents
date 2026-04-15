@@ -6,7 +6,7 @@
 ;; Helper with label-stack support
 (defmacro run-wasm (steps locals instrs)
   `(run ,steps
-        (make-state :store :fake
+        (make-state :store nil
                     :call-stack (list (make-frame :return-arity 1
                                                   :locals ,locals
                                                   :operand-stack (empty-operand-stack)
@@ -16,14 +16,24 @@
                                                   :locals nil
                                                   :operand-stack (empty-operand-stack)
                                                   :instrs nil
-                                                  :label-stack nil)))))
+                                                  :label-stack nil))
+                    :memory nil)))
+
+(defun get-result (r)
+  (declare (xargs :guard t :verify-guards nil))
+  (if (and (consp r) (eq :done (first r)))
+      (let* ((st (second r))
+             (cs (state->call-stack st))
+             (f (car cs)))
+        (top-operand (frame->operand-stack f)))
+    (if (statep r)
+        (top-operand (current-operand-stack r))
+      r)))
 
 (defmacro check-result (steps locals instrs expected)
   `(assert-event
-    (let ((result (run-wasm ,steps ,locals ,instrs)))
-      (and (statep result)
-           (equal (top-operand (current-operand-stack result))
-                  ,expected)))))
+    (equal (get-result (run-wasm ,steps ,locals ,instrs))
+           ,expected)))
 
 ;; M1 regression: add(3,4)=7
 (check-result 10 (list (make-i32-val 3) (make-i32-val 4))
