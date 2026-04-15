@@ -60,7 +60,30 @@
   :rule-classes :forward-chaining
   :hints (("Goal" :in-theory (enable u64p))))
 
-(defun storep (x) (declare (xargs :guard t) (ignore x)) t)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Store and function instances (M3)
+
+;; A function instance: (param-count local-count return-arity body-instrs)
+;; params are the first param-count locals; remaining are zero-initialized
+(defaggregate funcinst
+  ((param-count natp)
+   (local-count natp)
+   (return-arity natp)
+   (body true-listp))
+  :pred funcinstp)
+
+(defun funcinst-listp (x)
+  (declare (xargs :guard t))
+  (if (not (consp x))
+      (null x)
+    (and (funcinstp (first x))
+         (funcinst-listp (rest x)))))
+
+;; Store: list of function instances (indexed by position)
+;; Placeholder for globals/tables/memories
+(defun storep (x)
+  (declare (xargs :guard t))
+  (funcinst-listp x))
 (in-theory (disable (:t storep)))
 
 (defund i32-valp (val)
@@ -325,6 +348,9 @@
                                 (natp (second args))))
                 ;; (:return)
                 (:return (no-argsp args))
+                ;; Function call (M3)
+                ;; (:call func-idx)
+                (:call (local-idx-argsp args))
                 (otherwise nil))))))
 
 (defun instr-listp (instrs)
@@ -1133,6 +1159,49 @@
     state))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Function call (M3)
+
+;; call: invoke function by index
+;; (:call func-idx)
+;; Look up function in store, pop args, push new frame
+(defun execute-call (args state)
+  (declare (xargs :guard (statep state)
+                  :verify-guards nil))
+  (b* ((func-idx (first args))
+       (store (state->store state))
+       ((when (not (< func-idx (len store)))) :trap)
+       (finst (nth func-idx store))
+       ((when (not (funcinstp finst))) :trap)
+       (param-count (funcinst->param-count finst))
+       (local-count (funcinst->local-count finst))
+       (ret-arity (funcinst->return-arity finst))
+       (body (funcinst->body finst))
+       ;; Pop param-count values from caller's operand stack
+       (ostack (current-operand-stack state))
+       ((when (not (<= param-count (operand-stack-height ostack)))) :trap)
+       (param-vals (top-n-operands param-count ostack nil))
+       ;; Build new operand stack for caller (popped args)
+       (caller-ostack ostack)
+       ;; Pop param-count times
+       (caller-ostack (nthcdr param-count caller-ostack))
+       ;; Update caller state: advance past call instr, set ostack
+       (state (update-current-operand-stack caller-ostack state))
+       ;; Don't advance instrs yet (return-from-function does it)
+       ;; Initialize locals: params followed by zero-initialized locals
+       (zero-locals (make-list local-count :initial-element (make-i32-val 0)))
+       (all-locals (append param-vals zero-locals))
+       ;; Push new frame
+       (new-frame (make-frame :return-arity ret-arity
+                              :locals all-locals
+                              :operand-stack (empty-operand-stack)
+                              :instrs body
+                              :label-stack nil))
+       (call-stack (state->call-stack state))
+       (new-call-stack (push-call-stack new-frame call-stack))
+       (new-state (change-state state :call-stack new-call-stack)))
+    new-state))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Instruction dispatch
 
 ;; Returns a new state or :trap.
@@ -1195,6 +1264,8 @@
       (:br_if (execute-br_if args state))
       (:br_table (execute-br_table args state))
       (:return (execute-return state))
+      ;; Function call (M3)
+      (:call (execute-call args state))
       (otherwise (prog2$ (cw "Unhandled instr: ~x0.~%" instr)
                          :trap)))))
 
@@ -1251,7 +1322,10 @@
                   :trap
                 (run (+ -1 n) new-state-or-trap)))
           ;; No labels: return from function
-          (return-from-function state))
+          (let ((result (return-from-function state)))
+            (cond ((eq :trap result) :trap)
+                  ((and (consp result) (eq :done (first result))) result)
+                  (t (run (+ -1 n) result)))))
       (let ((new-state-or-trap (step state)))
         (if (eq :trap new-state-or-trap)
             :trap
