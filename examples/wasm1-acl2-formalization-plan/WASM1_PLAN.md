@@ -15,108 +15,82 @@
 
 ---
 
-## Milestone 0: Environment Bootstrap (Prerequisite)
+## Milestone 0: Environment Bootstrap (Prerequisite) ✅ COMPLETE
 
 **Goal**: Headless agent can build ACL2, certify existing books, run tests.
 
-- [ ] Install SBCL (`sudo apt-get install -y sbcl`)
-- [ ] Clone ACL2 (`git clone --depth 1 https://github.com/acl2/acl2.git /opt/acl2`)
-- [ ] Build ACL2 (`cd /opt/acl2 && make LISP=sbcl`)
-- [ ] Set `ACL2=/opt/acl2/saved_acl2`
-- [ ] Certify existing books:
-  ```bash
-  cd /opt/acl2/books
-  ACL2=$ACL2 make USE_QUICKLISP=0 ACL2_CUSTOMIZATION=NONE kestrel/wasm/execution.cert
-  ACL2=$ACL2 make USE_QUICKLISP=0 ACL2_CUSTOMIZATION=NONE kestrel/wasm/add-proof.cert
-  ACL2=$ACL2 make USE_QUICKLISP=0 ACL2_CUSTOMIZATION=NONE kestrel/wasm/parse-binary.cert
-  ```
-- [ ] Clone WASM spec for reference: `git clone --depth 1 --sparse https://github.com/WebAssembly/spec.git && cd spec && git sparse-checkout set specification/wasm-1.0`
-- [ ] Verify test pattern works (assert-event with concrete execution)
+- [x] Install SBCL (`sudo apt-get install -y sbcl`)
+- [x] Clone ACL2 (`git clone --depth 1 https://github.com/acl2/acl2.git`)
+- [x] Build ACL2 8.7+ with SBCL 2.5.2
+- [x] Set `ACL2=/tmp/acl2-full/saved_acl2`
+- [x] Certify existing books (execution.cert, add-proof.cert, parse-binary.cert)
+- [x] Clone WASM spec for reference
+- [x] Verify test pattern works (assert-event with concrete execution)
 
-**Exit criteria**: All 3 existing `.cert` files build; assert-event test of `run 4` add-program passes.
-
-**Estimated time**: 15 minutes.
+**Exit criteria**: ✅ All 3 existing `.cert` files build; assert-event test of `run 4` add-program passes.
 
 ---
 
-## Milestone 1: MVP — i32 Arithmetic + Variables + Parametric (Sprint 1)
+## Milestone 1: MVP — i32 Arithmetic + Variables + Parametric (Sprint 1) ✅ COMPLETE
 
 **Goal**: Execute simple WASM programs using i32 integer arithmetic,
-local variables, and parametric instructions. Enough to run programs
-like addition, max(a,b), conditional swap, and simple loops.
+local variables, and parametric instructions.
 
-### 1.1 Extend Value Types
-- [ ] Add `i64-valp` recognizer: `(:i64.const <u64>)` with `unsigned-byte-p 64`
-- [ ] Update `valp` to include `i64-valp`
-- [ ] Add `make-i64-val` constructor
-- [ ] Add `val-type` function: extract type tag from a val
-- [ ] Prove `valp` forward-chaining and type-preservation theorems
+### 1.1 Extend Value Types ✅
+- [x] Add `u64p`, `i64-valp` recognizer: `(:i64.const <u64>)` with `unsigned-byte-p 64`
+- [x] Update `valp` to include `i64-valp`
+- [x] Add `valp-of-make-i32-val` theorem
+- [ ] Add `make-i64-val` constructor (deferred to M5)
+- [ ] Prove `valp` forward-chaining theorems (deferred — using `verify-guards nil`)
 
-### 1.2 i32 Arithmetic Operations (SpecTec 3-numerics: `$iadd_` .. `$ipopcnt_`)
-- [ ] `execute-i32.sub` — `(bvminus 32 x y)`
-- [ ] `execute-i32.mul` — `(bvmult 32 x y)`
-- [ ] `execute-i32.div_u` — `(bvdiv 32 x y)`, trap if y=0
-- [ ] `execute-i32.div_s` — `(sbvdiv 32 x y)`, trap if y=0 or overflow
-- [ ] `execute-i32.rem_u` — `(bvmod 32 x y)`, trap if y=0
-- [ ] `execute-i32.rem_s` — signed remainder, trap if y=0
-- [ ] `execute-i32.and` — `(bvand 32 x y)`
-- [ ] `execute-i32.or` — `(bvor 32 x y)`
-- [ ] `execute-i32.xor` — `(bvxor 32 x y)`
-- [ ] `execute-i32.shl` — `(bvshl 32 x (mod y 32))`
-- [ ] `execute-i32.shr_u` — `(bvshr 32 x (mod y 32))`
-- [ ] `execute-i32.shr_s` — signed shift right
-- [ ] `execute-i32.rotl` — rotate left (may need custom def)
-- [ ] `execute-i32.rotr` — rotate right (may need custom def)
-- [ ] `execute-i32.clz` — count leading zeros (custom def)
-- [ ] `execute-i32.ctz` — count trailing zeros (custom def)
-- [ ] `execute-i32.popcnt` — population count (custom def)
+### 1.2 i32 Arithmetic Operations ✅
+- [x] `execute-i32.sub`, `execute-i32.mul`
+- [x] `execute-i32.div_u`, `execute-i32.div_s` (with trap on zero/overflow)
+- [x] `execute-i32.rem_u`, `execute-i32.rem_s`
+- [x] `execute-i32.and`, `execute-i32.or`, `execute-i32.xor`
+- [x] `execute-i32.shl`, `execute-i32.shr_u`, `execute-i32.shr_s`
+- [x] `execute-i32.rotl`, `execute-i32.rotr`
+- [x] `execute-i32.clz`, `execute-i32.ctz`, `execute-i32.popcnt`
+- [x] Used `def-i32-binop` / `def-i32-binop-trap` / `def-i32-unop` macros for DRY
 
-### 1.3 i32 Comparison & Test Operations
-- [ ] `execute-i32.eqz` — `(bool-to-bit (= x 0))`, push i32 result
-- [ ] `execute-i32.eq` — `(bool-to-bit (= x y))`
-- [ ] `execute-i32.ne` — `(bool-to-bit (/= x y))`
-- [ ] `execute-i32.lt_u` — `(bool-to-bit (< x y))`
-- [ ] `execute-i32.lt_s` — `(bool-to-bit (sbvlt 32 x y))`
-- [ ] `execute-i32.gt_u`, `gt_s`, `le_u`, `le_s`, `ge_u`, `ge_s`
+### 1.3 i32 Comparison & Test Operations ✅
+- [x] `execute-i32.eqz`
+- [x] `execute-i32.eq`, `execute-i32.ne`
+- [x] `execute-i32.lt_u`, `execute-i32.lt_s`
+- [x] `execute-i32.gt_u`, `execute-i32.gt_s`
+- [x] `execute-i32.le_u`, `execute-i32.le_s`
+- [x] `execute-i32.ge_u`, `execute-i32.ge_s`
+- [x] Used `def-i32-relop` macro with `i32-signed` helper
 
-### 1.4 i32 Constant
-- [ ] `execute-i32.const` — push `(make-i32-val n)` onto operand stack
+### 1.4 i32 Constant ✅
+- [x] `execute-i32.const` — push `(make-i32-val n)` onto operand stack
 
-### 1.5 Local Variable Instructions
-- [ ] `execute-local.set` — pop value, update locals[x]
-  - Add `update-nth-local` function
-  - Add `update-current-locals` state updater
-- [ ] `execute-local.tee` — duplicate top, then local.set
-  (SpecTec: `val (LOCAL.TEE x) ~> val val (LOCAL.SET x)`)
+### 1.5 Local Variable Instructions ✅
+- [x] `execute-local.set` with `update-nth-local`, `update-current-locals`
+- [x] `execute-local.tee` — keeps value on stack
 
-### 1.6 Parametric Instructions
-- [ ] `execute-nop` — no-op, advance instrs
-- [ ] `execute-unreachable` — return `:trap`
-- [ ] `execute-drop` — pop one value from operand stack
-- [ ] `execute-select` — pop condition (i32), pop 2 values, push selected one
+### 1.6 Parametric Instructions ✅
+- [x] `execute-nop`, `execute-unreachable`, `execute-drop`, `execute-select`
 
-### 1.7 Update Instruction Recognizer & Dispatch
-- [ ] Extend `instrp` to recognize all new instruction forms
-- [ ] Extend `execute-instr` case dispatch for all new instructions
-- [ ] Prove `statep-of-execute-instr` for all new cases
+### 1.7 Update Instruction Recognizer & Dispatch ✅
+- [x] Extended `instrp` with all new instruction forms
+- [x] Extended `execute-instr` case dispatch
+- [ ] `statep-of-execute-instr` theorem deferred (needs guard work)
+- [x] Using `verify-guards nil` throughout — guards to be restored in M8
 
-### 1.8 Tests for Milestone 1
-- [ ] Test: `3 + 4 = 7` (existing, verify still works)
-- [ ] Test: `10 - 3 = 7`
-- [ ] Test: `6 * 7 = 42`
-- [ ] Test: `10 / 3 = 3` (unsigned)
-- [ ] Test: `10 % 3 = 1`
-- [ ] Test: `0xFF & 0x0F = 0x0F`
-- [ ] Test: `i32.eqz 0 = 1`, `i32.eqz 5 = 0`
-- [ ] Test: `i32.lt_u 3 5 = 1`
-- [ ] Test: `select` with true/false conditions
-- [ ] Test: `local.set` then `local.get` roundtrip
-- [ ] Test: `local.tee` preserves value on stack
-- [ ] Test: `drop` removes top element
+### 1.8 Tests for Milestone 1 ✅ (18 tests pass)
+- [x] add(3,4)=7, sub(10,3)=7, mul(6,7)=42
+- [x] div_u(10,3)=3, rem_u(10,3)=1
+- [x] and(0xFF,0x0F)=0x0F
+- [x] eqz(0)=1, eqz(5)=0, lt_u(3,5)=1
+- [x] i32.const 42, nop+const, drop
+- [x] select true/false, local.set+get, local.tee
+- [x] shl(1,4)=16, shr_u(256,4)=16
 
-**Exit criteria**: All tests pass as assert-events. `execution.lisp` certifies.
+**Exit criteria**: ✅ 18 assert-event tests pass. `execution.lisp` certifies.
 
-**Estimated time**: 2-3 hours.
+**Known debt**: Guard verification deferred (using `verify-guards nil`).
+Will be addressed in Milestone 8 (Proofs).
 
 ---
 
