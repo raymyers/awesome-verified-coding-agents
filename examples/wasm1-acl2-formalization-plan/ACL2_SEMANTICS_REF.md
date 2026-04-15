@@ -51,22 +51,59 @@ echo '
 
 ### Test Pattern (assert-event)
 ```lisp
-;; Ground-truth execution test (computes concretely, no proofs needed)
+;; Simple test (no function calls — use sentinel frame)
 (assert-event
- (let ((result (run 4
-                    (make-state :store :fake
+ (let ((result (run 10
+                    (make-state :store nil
                                 :call-stack (list (make-frame :return-arity 1
                                                               :locals (list (make-i32-val 3) (make-i32-val 4))
                                                               :operand-stack (empty-operand-stack)
-                                                              :instrs '((:local.get 1) (:local.get 0) (:i32.add)))
+                                                              :instrs '((:local.get 1) (:local.get 0) (:i32.add))
+                                                              :label-stack nil)
                                                   (make-frame :return-arity 0
                                                               :locals nil
                                                               :operand-stack (empty-operand-stack)
-                                                              :instrs nil))))))
+                                                              :instrs nil
+                                                              :label-stack nil))))))
    (and (statep result)
         (equal (top-operand (current-operand-stack result))
                (make-i32-val 7)))))
+
+;; Test with function calls — use store and single frame (no sentinel needed)
+;; Result is (:done state) — extract with get-result helper
+(defun get-result (r)
+  (declare (xargs :guard t :verify-guards nil))
+  (if (and (consp r) (eq :done (first r)))
+      (let* ((st (second r))
+             (cs (state->call-stack st))
+             (f (car cs)))
+        (top-operand (frame->operand-stack f)))
+    (if (statep r) (top-operand (current-operand-stack r)) r)))
+
+(assert-event
+ (equal (get-result
+         (run 200
+              (make-state :store (list (make-funcinst :param-count 1 :local-count 0
+                                                      :return-arity 1
+                                                      :body '((:local.get 0) (:i32.eqz)
+                                                              (:if 1 ((:i32.const 1))
+                                                                   ((:local.get 0) (:local.get 0)
+                                                                    (:i32.const 1) (:i32.sub)
+                                                                    (:call 0) (:i32.mul))))))
+                          :call-stack (list (make-frame :return-arity 1 :locals nil
+                                                        :operand-stack (empty-operand-stack)
+                                                        :instrs '((:i32.const 5) (:call 0))
+                                                        :label-stack nil)))))
+        (make-i32-val 120)))  ; factorial(5) = 120
 ```
+
+### Key Gotchas Discovered
+1. **`:label-stack nil`**: Required in all `make-frame` calls (added in M2)
+2. **`:verify-guards nil`**: Required for all execute-* functions that call `update-current-instrs` (which has relaxed guards for nested control flow)
+3. **`repeat` not available**: Use `(make-list n :initial-element val)` instead
+4. **ACL2 package qualification**: BV functions need `acl2::` prefix (bvminus, bvmult, bvdiv, sbvdiv, etc.)
+5. **run returns (:done state)** when last frame returns — check for this in tests
+6. **Store format**: List of funcinst (indexed by position); `nil` for tests without calls
 
 ---
 

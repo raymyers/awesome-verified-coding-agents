@@ -351,6 +351,12 @@
                 ;; Function call (M3)
                 ;; (:call func-idx)
                 (:call (local-idx-argsp args))
+                ;; Memory (M4)
+                ;; (:i32.load offset) (:i32.store offset)
+                (:i32.load (and (= (len args) 1) (natp (first args))))
+                (:i32.store (and (= (len args) 1) (natp (first args))))
+                (:memory.size (no-argsp args))
+                (:memory.grow (no-argsp args))
                 (otherwise nil))))))
 
 (defun instr-listp (instrs)
@@ -508,12 +514,31 @@
   :hints (("Goal" :in-theory (enable push-call-stack top-frame))))
 
 ;; todo: or make it a stobj?
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Linear memory (M4)
+
+;; Memory is a list of bytes (unsigned-byte-p 8)
+(defun bytep (x)
+  (declare (xargs :guard t))
+  (unsigned-byte-p 8 x))
+
+(defun byte-listp (x)
+  (declare (xargs :guard t))
+  (if (not (consp x))
+      (null x)
+    (and (bytep (first x))
+         (byte-listp (rest x)))))
+
+;; WASM page size is 64KiB
+(defconst *page-size* 65536)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (defaggregate state
   ((store storep)
    (call-stack (and (call-stackp call-stack)
-                    (consp call-stack) ; must be at least one frame
-                    ))
-   )
+                    (consp call-stack)))
+   (memory byte-listp))
   :pred statep)
 
 
@@ -1159,6 +1184,129 @@
     state))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Memory instructions (M4)
+
+;; Read n bytes from memory starting at addr (little-endian)
+(defun mem-read-bytes (n addr memory)
+  (declare (xargs :guard (and (natp n) (natp addr))
+                  :verify-guards nil))
+  (if (zp n) nil
+    (cons (nth addr memory)
+          (mem-read-bytes (1- n) (1+ addr) memory))))
+
+;; Write bytes to memory at addr (returns new memory)
+(defun mem-write-bytes (bytes addr memory)
+  (declare (xargs :guard (and (true-listp bytes) (natp addr))
+                  :verify-guards nil))
+  (if (not (consp bytes)) memory
+    (mem-write-bytes (rest bytes) (1+ addr)
+                     (update-nth addr (first bytes) memory))))
+
+;; Little-endian conversion: 4 bytes → u32
+(defun le-bytes-to-u32 (bytes)
+  (declare (xargs :guard t :verify-guards nil))
+  (+ (nfix (first bytes))
+     (ash (nfix (second bytes)) 8)
+     (ash (nfix (third bytes)) 16)
+     (ash (nfix (fourth bytes)) 24)))
+
+;; u32 → 4 little-endian bytes
+(defun u32-to-le-bytes (x)
+  (declare (xargs :guard (u32p x) :verify-guards nil))
+  (list (logand x #xff)
+        (logand (ash x -8) #xff)
+        (logand (ash x -16) #xff)
+        (logand (ash x -24) #xff)))
+
+;; Update state memory
+(defun update-memory (memory state)
+  (declare (xargs :guard (and (byte-listp memory) (statep state))
+                  :verify-guards nil))
+  (change-state state :memory memory))
+
+;; i32.load: pop base addr, add offset, read 4 bytes, push i32
+;; (:i32.load offset)
+(defun execute-i32.load (args state)
+  (declare (xargs :guard (statep state)
+                  :verify-guards nil))
+  (b* ((offset (first args))
+       (ostack (current-operand-stack state))
+       ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
+       (base-val (top-operand ostack))
+       ((when (not (i32-valp base-val))) :trap)
+       (base (farg1 base-val))
+       (addr (+ base (nfix offset)))
+       (memory (state->memory state))
+       ((when (< (len memory) (+ addr 4))) :trap) ; bounds check
+       (bytes (mem-read-bytes 4 addr memory))
+       (val (le-bytes-to-u32 bytes))
+       (ostack (pop-operand ostack))
+       (ostack (push-operand (make-i32-val (acl2::logand val #xFFFFFFFF)) ostack))
+       (state (update-current-operand-stack ostack state)))
+    (advance-instrs state)))
+
+;; i32.store: pop value, pop base addr, write 4 bytes to memory
+;; (:i32.store offset)
+(defun execute-i32.store (args state)
+  (declare (xargs :guard (statep state)
+                  :verify-guards nil))
+  (b* ((offset (first args))
+       (ostack (current-operand-stack state))
+       ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
+       ;; WASM stack order: base is pushed first, value on top
+       (val-val (top-operand ostack))
+       ((when (not (i32-valp val-val))) :trap)
+       (val (farg1 val-val))
+       (ostack (pop-operand ostack))
+       (base-val (top-operand ostack))
+       ((when (not (i32-valp base-val))) :trap)
+       (base (farg1 base-val))
+       (ostack (pop-operand ostack))
+       (addr (+ base (nfix offset)))
+       (memory (state->memory state))
+       ((when (< (len memory) (+ addr 4))) :trap) ; bounds check
+       (bytes (u32-to-le-bytes val))
+       (new-memory (mem-write-bytes bytes addr memory))
+       (state (update-memory new-memory state))
+       (state (update-current-operand-stack ostack state)))
+    (advance-instrs state)))
+
+;; memory.size: push current memory size in pages
+(defun execute-memory.size (state)
+  (declare (xargs :guard (statep state)
+                  :verify-guards nil))
+  (b* ((memory (state->memory state))
+       (pages (floor (len memory) *page-size*))
+       (ostack (current-operand-stack state))
+       (ostack (push-operand (make-i32-val pages) ostack))
+       (state (update-current-operand-stack ostack state)))
+    (advance-instrs state)))
+
+;; memory.grow: grow memory by n pages, push old size (or -1 on failure)
+(defun execute-memory.grow (state)
+  (declare (xargs :guard (statep state)
+                  :verify-guards nil))
+  (b* ((ostack (current-operand-stack state))
+       ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
+       (n-val (top-operand ostack))
+       ((when (not (i32-valp n-val))) :trap)
+       (n (farg1 n-val))
+       (ostack (pop-operand ostack))
+       (memory (state->memory state))
+       (old-pages (floor (len memory) *page-size*))
+       (new-size (+ (len memory) (* n *page-size*)))
+       ;; WASM 1.0 max = 65536 pages = 4GiB (but we cap lower for safety)
+       ((when (> new-size (* 256 *page-size*))) ; cap at 256 pages = 16MiB
+        (let* ((ostack (push-operand (make-i32-val #xFFFFFFFF) ostack))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       (new-memory (append memory (make-list (* n *page-size*) :initial-element 0)))
+       (ostack (push-operand (make-i32-val old-pages) ostack))
+       (state (update-current-operand-stack ostack state))
+       (state (update-memory new-memory state)))
+    (advance-instrs state)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Function call (M3)
 
 ;; call: invoke function by index
@@ -1266,6 +1414,11 @@
       (:return (execute-return state))
       ;; Function call (M3)
       (:call (execute-call args state))
+      ;; Memory (M4)
+      (:i32.load (execute-i32.load args state))
+      (:i32.store (execute-i32.store args state))
+      (:memory.size (execute-memory.size state))
+      (:memory.grow (execute-memory.grow state))
       (otherwise (prog2$ (cw "Unhandled instr: ~x0.~%" instr)
                          :trap)))))
 
@@ -1290,20 +1443,18 @@
   (declare (xargs :guard (and (statep state)
                               (not (consp (current-instrs state))))
                   :verify-guards nil))
-  (b* ((f (current-frame state))
+  (b* ((call-stack (state->call-stack state))
+       ((when (not (consp (cdr call-stack)))) ; only 1 frame left — we're done
+        `(:done ,state))
+       (f (current-frame state))
        (n (frame->return-arity f))
        (ostack (frame->operand-stack f))
-       ((when (not (equal n (operand-stack-height ostack)))) ; todo: "exactly n" -- the language is unclear?
-        :trap ; should never happen, due to validation
-        )
-       (valn (top-n-operands n ostack nil)) ; deepest first
-       (call-stack (pop-call-stack (state->call-stack state)))
-       ((when (not (consp call-stack))) ; returning from the only remaining frame
-        `(:done ,state))
+       ((when (not (<= n (operand-stack-height ostack))))
+        :trap)
+       (valn (top-n-operands n ostack nil))
+       (call-stack (pop-call-stack call-stack))
        (state (change-state state :call-stack call-stack))
        (state (update-current-operand-stack (push-vals valn (current-operand-stack state)) state))
-       ;; remove the call instr now, after the call returns (leaving it there
-       ;; during the call may help with debugging):
        (state (update-current-instrs (rest (current-instrs state)) state)))
     state))
 
