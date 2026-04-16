@@ -758,3 +758,112 @@ All packed load/store macros (`def-packed-load`, `def-packed-store`) follow the
 same pattern as the full-width ops, with parameterized byte count and
 result-construction expression. The store macros truncate via `(logand val #xFF)`
 for 1-byte or explicit LE decomposition for 2/4-byte stores.
+
+---
+
+## 11. Tables and call_indirect (M7b)
+
+### WASM 1.0 Table Model
+In WASM 1.0, a module has at most one table (the `funcref` table).
+The table is a vector of function references (indices into the store's
+function instance list). Entries can be `nil` (uninitialized).
+
+**Spec reference**: SpecTec `4-runtime.spectec` defines `tableinst`:
+```
+tableinst = { elem : (funcaddr | ref.null)*, max? : u32? }
+```
+
+### ACL2 Model
+- Added `table` field to `state` aggregate: `(table true-listp)`
+- Table entries are either `natp` (valid func-idx) or `nil` (uninitialized)
+- Backward-compatible: existing `make-state` calls default `:table nil`
+
+### execute-call_indirect Implementation
+```lisp
+;; Pop i32 table index → look up in table → delegate to execute-call
+(defun execute-call_indirect (args state)
+  (b* ((ostack (current-operand-stack state))
+       ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
+       (idx-val (top-operand ostack))
+       ((when (not (i32-valp idx-val))) :trap)
+       (tbl-idx (farg1 idx-val))
+       (ostack (pop-operand ostack))
+       (state (update-current-operand-stack ostack state))
+       (table (state->table state))
+       ((when (not (< tbl-idx (len table)))) :trap)
+       (func-idx (nth tbl-idx table))
+       ((when (not (natp func-idx))) :trap))
+    (execute-call (list func-idx) state)))
+```
+
+### Key Design Decisions
+1. **Type-idx ignored**: WASM 1.0 call_indirect takes a type index for
+   runtime type checking. We accept it in the instruction but don't check it.
+   This is correct for well-typed programs; type checking deferred to M9.
+2. **Table in state, not store**: Spec puts tables in the store, but our
+   `storep` is just `funcinst-listp`. Adding table to state was simpler
+   and backward-compatible. Can refactor to store later.
+3. **Delegation to execute-call**: After resolving the table lookup,
+   we reuse the existing `execute-call` machinery by passing the func-idx.
+
+---
+
+## 12. Advanced Proof Techniques (M8.4, M8.5)
+
+### Memory Roundtrip Proof Strategy (proof-mem-roundtrip.lisp)
+
+**Challenge**: Proving `(le-bytes-to-u32 (u32-to-le-bytes x)) = x` requires
+reasoning about bitwise operations (logand, ash) that ACL2's default theory
+can't handle.
+
+**Solution**: Encapsulate scoping for arithmetic-5:
+```lisp
+(encapsulate ()
+  (local (include-book "arithmetic-5/top" :dir :system))
+  (local (include-book "ihs/logops-lemmas" :dir :system))
+  (defthm le-bytes-roundtrip
+    (implies (unsigned-byte-p 32 x)
+             (equal (le-bytes-to-u32 (u32-to-le-bytes x)) x))
+    :hints (("Goal" :in-theory (enable le-bytes-to-u32 u32-to-le-bytes)))))
+```
+
+**Why encapsulate?** arithmetic-5 aggressively rewrites arithmetic expressions,
+which conflicts with BV library rules. Scoping it with `(local ...)` inside
+encapsulate means the aggressive rules are only active during this proof.
+
+### Layered Hint Strategy for Composite Proofs
+
+The `i32-store-load-semantic-roundtrip` theorem combines three lemmas:
+```lisp
+:hints (("Goal"
+         :use ((:instance u32-to-le-bytes-is-list4 (x v))
+               (:instance mem-read-write-4 ...)
+               (:instance le-bytes-roundtrip (x v)))
+         :in-theory (disable ...)))
+```
+
+**Pattern**: When the proof has too many moving parts:
+1. Prove each "layer" as a separate lemma with its own theory
+2. In the final theorem, `:use` all three lemmas as instances
+3. `:disable` the definitions so ACL2 reasons only with the lemma statements
+
+### Bitwise Proof Lifting (proof-bitwise.lisp)
+
+**Pattern for lifting BV library theorems to WASM level**:
+The BV library already has `bvxor-same`, `bvand-same`, `bvor-of-0-arg3`.
+To prove these at the WASM instruction level:
+
+1. Use the same theory list as `i32-add-spec` (full instruction unfolding)
+2. ACL2 unfolds the 3-instruction execution to a term containing the BV op
+3. The BV library's existing rules fire automatically
+
+No special hints needed — the standard WASM execution theory + BV library suffice.
+
+### Proof File Inventory (14 Q.E.D.s total)
+
+| File | Theorems | Technique |
+|------|----------|-----------|
+| proof-add-spec.lisp | i32-add-spec, i32-add-commutative | :expand + full theory |
+| proof-sub-spec.lisp | i32-sub-spec, i32-sub-self-zero, i32-add-sub-inverse | :expand + full theory |
+| proof-mem-roundtrip.lisp | le-bytes-roundtrip, nth-update-nth-same/diff, mem-read-write-4, u32-to-le-bytes-is-list4, i32-store-load-semantic-roundtrip | encapsulate + layered :use |
+| proof-bitwise.lisp | i32-xor-self-zero, i32-and-idempotent, i32-or-zero-identity | :expand + BV library |

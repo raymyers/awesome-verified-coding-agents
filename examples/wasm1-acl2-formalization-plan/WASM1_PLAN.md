@@ -13,7 +13,7 @@
 > **Existing skeleton**: [Kestrel WASM books](https://github.com/acl2/acl2/tree/master/books/kestrel/wasm)
 > (execution.lisp, parse-binary.lisp, add-proof.lisp)
 
-### Current Status (M0–M6, M4b, M8 COMPLETE)
+### Current Status (M0–M6, M4b, M7b, M8 COMPLETE)
 
 | Milestone | Status | Instructions | Tests | Key Capability |
 |-----------|--------|-------------|-------|----------------|
@@ -25,14 +25,16 @@
 | M4b: Packed Mem | ✅ | 15 | 10 | load8/16_u/s, store8/16, i64 variants |
 | M5: i64 + Conversions | ✅ | 37 | 24 | i64 arithmetic/bitwise/compare, conversions, i64 memory |
 | M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability enforcement |
-| M8: Proofs | ✅ | 5 thms | — | add-spec, add-commutative, sub-spec, sub-self-zero, add-sub-inverse |
-| M7: Floats/Tables | todo | | | f32/f64, tables, indirect calls |
+| M8: Proofs | ✅ | 14 thms | — | add/sub spec, bitwise props, memory roundtrip |
+| M7b: Tables | ✅ | 1 | 6 | call_indirect, table lookup, OOB/nil traps |
+| M7a: Floats | todo | | | f32/f64 arithmetic |
 | M9: Validation | todo | | | Type checking, module validation |
-| **Total done** | | **102 instrs** | **45 ACL2 tests** | + 5 machine-checked theorems |
+| **Total done** | | **103 instrs** | **51 ACL2 tests** | + 14 machine-checked theorems |
 
-**execution.lisp**: 2126 lines, proofs/ directory with 5 Q.E.D. theorems, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
-**Oracle pipeline**: 39 checks (7 WAT files × Node.js), all pass
-**ACL2 tests**: 45 (20 spot-check + 10 i32 packed + 15 i64 packed + edge cases)
+**execution.lisp**: 2165 lines, proofs/ directory with 14 Q.E.D. theorems (4 proof files), certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**Oracle pipeline**: 44 checks (8 WAT files × Node.js), all pass
+**ACL2 tests**: 51 (20 spot-check + 10 packed-mem + 15 packed-i64 + 6 tables)
+**Proofs**: 14 Q.E.D. theorems across 4 files (add-spec, sub-spec, bitwise, memory-roundtrip)
 
 ---
 
@@ -372,14 +374,38 @@ sentinel trap issue). All M1-M4 tests pass.
 
 ---
 
-## Milestone 7b: Tables + Indirect Calls (Sprint 7)
+## Milestone 7b: Tables + Indirect Calls (Sprint 7) ✅ COMPLETE
 
 **Goal**: Table operations and `call_indirect`.
 
-- [ ] Table instance (`tableinst`): vector of function references
-- [ ] `call_indirect` — look up function in table by index, type-check, call
-- [ ] Elem segment initialization (fill table with function addresses)
-- [ ] Table bounds checking and traps
+### 7b.1 Table Support ✅
+- [x] Added `table` field to state aggregate (list of func-idx or nil entries)
+- [x] Backward-compatible: existing make-state calls work without `:table` (defaults to nil)
+- [x] `state->table` accessor for table lookup
+
+### 7b.2 call_indirect Instruction ✅
+- [x] `execute-call_indirect` — pop i32 table index from stack, look up function
+- [x] Delegates to `execute-call` with resolved func-idx
+- [x] Trap on: out-of-bounds index, nil (uninitialized) table entry, empty table
+- [x] Type-idx parameter accepted but not yet checked (deferred to M9 validation)
+- [x] Added to `instrp` recognizer and `execute-instr` dispatch
+
+### 7b.3 Tests ✅ (6 tests pass)
+- [x] call_indirect table[0] → double(5) = 10
+- [x] call_indirect table[1] → inc(42) = 43
+- [x] call_indirect OOB table index → trap
+- [x] call_indirect nil table entry → trap
+- [x] call_indirect empty table → trap
+- [x] Vtable dispatch: same arg, different table idx → different functions
+
+### 7b.4 Oracle Validation ✅
+- [x] call_indirect.wat compiled and tested with Node.js/V8
+- [x] 5 oracle checks (4 successful calls + 1 OOB trap) match ACL2 results
+
+**Exit criteria**: ✅ call_indirect works. 6 ACL2 tests + 5 oracle checks pass. Certified.
+
+- [ ] Elem segment initialization (deferred to M7c)
+- [ ] Type checking for call_indirect (deferred to M9)
 
 ---
 
@@ -419,11 +445,11 @@ sentinel trap issue). All M1-M4 tests pass.
 
 ---
 
-## Milestone 8: Proofs & Verification (Sprint 8) — Initial Proofs ✅
+## Milestone 8: Proofs & Verification (Sprint 8) — 14 Theorems Proven ✅
 
 **Goal**: Prove correctness theorems for representative WASM programs.
 
-### 8.1 Proven Theorems ✅ (5 total)
+### 8.1 Proven Theorems ✅ (14 total, 4 proof files)
 - [x] **`i32-add-spec`** (Q.E.D.): For all u32 a,b, executing
   `(i32.const a) (i32.const b) (i32.add)` produces `(make-i32-val (bvplus 32 a b))`
   on the operand stack. This is the first instruction specification theorem.
@@ -440,16 +466,36 @@ sentinel trap issue). All M1-M4 tests pass.
 - [x] **Macro pitfall**: `advance-instrs` and `ffn-symb` are macros — cannot
   appear in `(enable ...)` lists (gives "does not designate a rule" error)
 
-### 8.3 Future Proofs (todo)
+### 8.3 Memory Roundtrip Proofs ✅ (M8.4 — 6 Q.E.D.s in proof-mem-roundtrip.lisp)
+- [x] **`le-bytes-roundtrip`** (Q.E.D.): `(le-bytes-to-u32 (u32-to-le-bytes x)) = x` for u32 x.
+  Key technique: encapsulate scopes arithmetic-5 + ihs/logops-lemmas.
+- [x] **`nth-update-nth-same`** (Q.E.D.): `(nth i (update-nth i v lst)) = v`.
+- [x] **`nth-update-nth-diff`** (Q.E.D.): `(nth i (update-nth j v lst)) = (nth i lst)` when i≠j.
+- [x] **`mem-read-write-4`** (Q.E.D.): Reading 4 bytes after writing returns written bytes.
+  Uses `:expand` hints for unrolling mem-read-bytes/mem-write-bytes.
+- [x] **`u32-to-le-bytes-is-list4`** (rule-class nil): Expands encoding to concrete 4-element list.
+- [x] **`i32-store-load-semantic-roundtrip`** (Q.E.D.): THE core memory correctness property —
+  writing u32-to-le-bytes(v) then reading 4 bytes and decoding = v.
+  Uses layered `:use` hints composing the three lemmas above.
+
+### 8.4 Bitwise Property Proofs ✅ (M8.5 — 3 Q.E.D.s in proof-bitwise.lisp)
+- [x] **`i32-xor-self-zero`** (Q.E.D.): `x XOR x = 0` at WASM instruction level.
+  Lifts `bvxor-same` from BV library through full instruction execution.
+- [x] **`i32-and-idempotent`** (Q.E.D.): `x AND x = x` at WASM instruction level.
+  Lifts `bvand-same` — result is `(bvchop 32 x)` which equals x for u32.
+- [x] **`i32-or-zero-identity`** (Q.E.D.): `x OR 0 = x` at WASM instruction level.
+  Lifts `bvor-of-0-arg3` through full 3-instruction execution.
+
+### 8.5 Future Proofs (todo)
 - [ ] Extend `proof-support.lisp` with defopeners for all new functions
-- [ ] **sub-proof** — subtraction computes bvminus
 - [ ] **max-proof** — max(a,b) using if/else is correct
 - [ ] **factorial-proof** — loop-based factorial computes n!
   (inductive proof over loop iterations — requires loop invariant)
 - [ ] **memory-copy-proof** — copying N bytes produces identical sequences
+- [ ] **call_indirect-spec** — indirect call resolves to correct function
 - [ ] Induction schemes for loop proofs
 
-**Exit criteria**: ✅ 5 proofs certified (exceeds target of 3). Sub-spec + properties proven.
+**Exit criteria**: ✅ 14 proofs certified (exceeds target of 3). Arithmetic, bitwise, and memory properties proven.
 
 **Estimated time for remaining proofs**: 4-8 hours.
 

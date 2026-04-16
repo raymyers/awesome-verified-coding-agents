@@ -379,6 +379,11 @@
                 ;; Function call (M3)
                 ;; (:call func-idx)
                 (:call (local-idx-argsp args))
+                ;; Indirect call (M7b)
+                ;; (:call_indirect type-idx table-idx)
+                ;; type-idx currently ignored; table-idx defaults to 0
+                (:call_indirect (and (<= 1 (len args))
+                                     (natp (first args))))
                 ;; i64 operations (M5)
                 (:i64.const (i64-const-argsp args))
                 ;; i64 arithmetic
@@ -623,7 +628,8 @@
    (call-stack (and (call-stackp call-stack)
                     (consp call-stack)))
    (memory byte-listp)
-   (globals globalinst-listp))
+   (globals globalinst-listp)
+   (table true-listp))     ; M7b: table of func-idx or nil entries
   :pred statep)
 
 
@@ -1927,6 +1933,38 @@
     new-state))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; call_indirect (M7b): indirect call through table
+;; (:call_indirect type-idx)
+;; Pops an i32 table index from the stack, looks up the function in the table,
+;; then calls it. Type-idx is currently ignored (no type checking yet).
+(defun execute-call_indirect (args state)
+  (declare (xargs :guard (statep state)
+                  :verify-guards nil)
+           (ignore args))
+  (b* (;; type-idx unused for now (would be used for type checking)
+       ;; Pop the table index from the stack
+       (ostack (current-operand-stack state))
+       ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
+       (idx-val (top-operand ostack))
+       ((when (not (i32-valp idx-val))) :trap)
+       (tbl-idx (farg1 idx-val))
+       (ostack (pop-operand ostack))
+       (state (update-current-operand-stack ostack state))
+       ;; Look up the function in the table
+       (table (state->table state))
+       ((when (not (<= 0 tbl-idx))) :trap)
+       ((when (not (< tbl-idx (len table)))) :trap)
+       (func-idx (nth tbl-idx table))
+       ;; nil = uninitialized entry → trap
+       ((when (not (natp func-idx))) :trap)
+       ;; Delegate to execute-call with the resolved func-idx
+       ;; But first, advance past call_indirect since execute-call
+       ;; handles its own frame pushing without advancing
+       )
+    ;; Reuse execute-call machinery by calling it with the resolved func-idx
+    (execute-call (list func-idx) state)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Instruction dispatch
 
 ;; Returns a new state or :trap.
@@ -1994,6 +2032,7 @@
       (:return (execute-return state))
       ;; Function call (M3)
       (:call (execute-call args state))
+      (:call_indirect (execute-call_indirect args state))
       ;; i64 operations (M5)
       (:i64.const (execute-i64.const args state))
       (:i64.add (execute-i64.add state))

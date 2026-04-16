@@ -100,6 +100,25 @@ const pm64 = await load('packed_mem_i64');
   if (!pass) failures++;
 });
 
+// --- call_indirect (M7b) ---
+const ci = await load('call_indirect');
+[
+  ['dispatch(5,0)=double(5)', ci.dispatch(5, 0), 10],
+  ['dispatch(42,1)=inc(42)', ci.dispatch(42, 1), 43],
+  ['dispatch(3,0)=double(3)', ci.dispatch(3, 0), 6],
+  ['dispatch(3,1)=inc(3)', ci.dispatch(3, 1), 4],
+].forEach(([label, actual, expected]) => {
+  if (!check(label, actual, expected)) failures++;
+});
+// OOB trap test
+try {
+  ci.dispatch(5, 99);
+  console.log('  FAIL: dispatch(5,99) should have trapped');
+  failures++;
+} catch (e) {
+  console.log('  PASS: dispatch(5,99) → trap');
+}
+
 console.log('');
 if (failures === 0) {
   console.log('=== ALL ORACLE CHECKS PASSED ===');
