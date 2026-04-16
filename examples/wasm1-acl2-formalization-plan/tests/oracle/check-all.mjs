@@ -78,6 +78,28 @@ const pm = await load('packed_mem');
   if (!check(label, actual, expected)) failures++;
 });
 
+// --- packed_mem_i64 ---
+const pm64 = await load('packed_mem_i64');
+[
+  ['i64_load8_u(0)', pm64.i64_load8_u(0), 171n],
+  ['i64_load8_s(0)', pm64.i64_load8_s(0), -85n],
+  ['i64_load8_s(3)', pm64.i64_load8_s(3), 18n],
+  ['i64_load16_u(0)', pm64.i64_load16_u(0), 52651n],
+  ['i64_load16_s(0)', pm64.i64_load16_s(0), -12885n],
+  ['i64_load32_u(0)', pm64.i64_load32_u(0), 317705643n],
+  ['i64_load32_s(0)', pm64.i64_load32_s(0), 317705643n],
+  ['i64_load32_s(4)', pm64.i64_load32_s(4), -1703389644n],
+  ['i64_store8(16,0x1FF)', pm64.i64_store8_load(16, 0x1FFn), 255n],
+  ['i64_store16(20,0xDEADBEEF)', pm64.i64_store16_load(20, 0xDEADBEEFn), 48879n],
+  ['i64_store32(24,0x123456789ABCDEF)', pm64.i64_store32_load(24, 0x123456789ABCDEFn), 2309737967n],
+].forEach(([label, actual, expected]) => {
+  // BigInt comparison
+  const pass = actual === expected;
+  const tag = pass ? 'PASS' : 'FAIL';
+  console.log(`  ${tag}: ${label} = ${actual}` + (pass ? '' : ` (expected ${expected})`));
+  if (!pass) failures++;
+});
+
 console.log('');
 if (failures === 0) {
   console.log('=== ALL ORACLE CHECKS PASSED ===');

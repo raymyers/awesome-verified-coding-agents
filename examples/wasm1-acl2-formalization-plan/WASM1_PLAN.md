@@ -28,10 +28,11 @@
 | M8: Proofs | ✅ | 5 thms | — | add-spec, add-commutative, sub-spec, sub-self-zero, add-sub-inverse |
 | M7: Floats/Tables | todo | | | f32/f64, tables, indirect calls |
 | M9: Validation | todo | | | Type checking, module validation |
-| **Total done** | | **102 instrs** | **89 tests** | + 5 machine-checked theorems |
+| **Total done** | | **102 instrs** | **45 ACL2 tests** | + 5 machine-checked theorems |
 
 **execution.lisp**: 2126 lines, proofs/ directory with 5 Q.E.D. theorems, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
-**Oracle pipeline**: 28 checks (6 WAT files × Node.js), all pass
+**Oracle pipeline**: 39 checks (7 WAT files × Node.js), all pass
+**ACL2 tests**: 45 (20 spot-check + 10 i32 packed + 15 i64 packed + edge cases)
 
 ---
 

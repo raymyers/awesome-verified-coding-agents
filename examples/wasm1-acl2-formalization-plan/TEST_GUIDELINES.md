@@ -341,3 +341,17 @@ Values confirmed by `wat2wasm` + Node.js V8 engine:
 | is_prime | 12 | 0 | ✅ |
 | is_prime | 97 | 1 | ✅ |
 | is_prime | 100 | 0 | ✅ |
+| i32.load8_u | addr=0, mem=[0xAB,...] | 171 | ✅ |
+| i32.load8_s | addr=0, mem=[0xAB,...] | -85 (u32: 4294967211) | ✅ |
+| i32.load16_u | addr=0 | 52651 (0xCDAB) | ✅ |
+| i32.load16_s | addr=0 | -12885 (u32: 4294954411) | ✅ |
+| i32.store8 | addr=16, val=0x1FF | read-back: 255 | ✅ |
+| i32.store16 | addr=20, val=0xDEADBEEF | read-back: 48879 | ✅ |
+| i64.load8_u | addr=0 | 171 | ✅ |
+| i64.load8_s | addr=0 | -85 (u64: 18446744073709551531) | ✅ |
+| i64.load16_s | addr=0 | -12885 (u64: 18446744073709538731) | ✅ |
+| i64.load32_u | addr=0 | 317705643 | ✅ |
+| i64.load32_s | addr=4 | -1703389644 (u64: 18446744072006161972) | ✅ |
+| i64.store8 | addr=16, val=0x1FF | read-back: 255 | ✅ |
+| i64.store16 | addr=20, val=0xDEADBEEF | read-back: 48879 | ✅ |
+| i64.store32 | addr=24, val=0x123456789ABCDEF | read-back: 2309737967 | ✅ |
