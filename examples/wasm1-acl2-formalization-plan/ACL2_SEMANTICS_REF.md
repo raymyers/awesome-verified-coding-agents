@@ -722,3 +722,39 @@ Do NOT include macros in `(enable ...)` lists — ACL2 gives a theory error.
 For `i32-add-commutative`, the same `:expand` technique works because both sides
 reduce to `(bvplus 32 a b)` and `(bvplus 32 b a)` respectively, and the BV library
 has `bvplus` commutativity built in.
+
+### Subtraction Proof Patterns (Proven)
+
+**`i32-sub-spec`**: Same structure as add-spec but with `execute-i32.sub` in the
+theory. Reduces to `(make-i32-val (bvminus 32 a b))` — trivial once execution
+is unfolded.
+
+**`i32-sub-self-is-zero`**: ACL2 rewrites `(bvminus 32 a a)` to
+`(bvplus 32 a (bvuminus 32 a))` internally. To close this, we must either:
+1. Enable `acl2::bvminus` so it stays as `(bvminus 32 a a)` which rewrites
+   to 0 via `bvminus-same`, OR
+2. Include `kestrel/bv/bvuminus` and use `bvplus-of-bvuminus-same-alt`:
+   `(bvplus size x (bvuminus size x)) = 0`
+
+Approach used: `(include-book "kestrel/bv/bvuminus")` + enable `acl2::bvminus`.
+
+**`i32-add-sub-inverse`**: Shows `(a + b) - b = a`. The key BV library lemma is
+`bvminus-of-bvplus-same`: `(bvminus size (bvplus size x y) y) = (bvchop size x)`.
+Since `a` is `(unsigned-byte-p 32 a)`, `(bvchop 32 a) = a`.
+
+### Packed Memory Implementation Notes
+
+Sign-extension helpers use explicit arithmetic rather than `bvsx` for simplicity
+in concrete evaluation. For example:
+```lisp
+(defun sign-extend-8-to-32 (b)
+  (let ((b (logand (nfix b) #xFF)))
+    (if (>= b 128) (- (expt 2 32) (- 256 b)) b)))
+```
+This produces a u32 value where bit 31 is set when the input byte's bit 7 is set.
+The oracle confirms: `load8_s(0xAB)` = 4294967211 = 0xFFFFFFAB.
+
+All packed load/store macros (`def-packed-load`, `def-packed-store`) follow the
+same pattern as the full-width ops, with parameterized byte count and
+result-construction expression. The store macros truncate via `(logand val #xFF)`
+for 1-byte or explicit LE decomposition for 2/4-byte stores.

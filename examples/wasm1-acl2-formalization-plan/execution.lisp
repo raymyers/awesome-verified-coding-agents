@@ -423,6 +423,22 @@
                 (:i32.store (and (= (len args) 1) (natp (first args))))
                 (:i64.load (and (= (len args) 1) (natp (first args))))
                 (:i64.store (and (= (len args) 1) (natp (first args))))
+                ;; Packed memory (M4b)
+                (:i32.load8_u  (and (= (len args) 1) (natp (first args))))
+                (:i32.load8_s  (and (= (len args) 1) (natp (first args))))
+                (:i32.load16_u (and (= (len args) 1) (natp (first args))))
+                (:i32.load16_s (and (= (len args) 1) (natp (first args))))
+                (:i32.store8   (and (= (len args) 1) (natp (first args))))
+                (:i32.store16  (and (= (len args) 1) (natp (first args))))
+                (:i64.load8_u  (and (= (len args) 1) (natp (first args))))
+                (:i64.load8_s  (and (= (len args) 1) (natp (first args))))
+                (:i64.load16_u (and (= (len args) 1) (natp (first args))))
+                (:i64.load16_s (and (= (len args) 1) (natp (first args))))
+                (:i64.load32_u (and (= (len args) 1) (natp (first args))))
+                (:i64.load32_s (and (= (len args) 1) (natp (first args))))
+                (:i64.store8   (and (= (len args) 1) (natp (first args))))
+                (:i64.store16  (and (= (len args) 1) (natp (first args))))
+                (:i64.store32  (and (= (len args) 1) (natp (first args))))
                 (:memory.size (no-argsp args))
                 (:memory.grow (no-argsp args))
                 (otherwise nil))))))
@@ -1584,6 +1600,44 @@
         (logand (ash x -16) #xff)
         (logand (ash x -24) #xff)))
 
+;; Little-endian: 2 bytes → u16
+(defun le-bytes-to-u16 (bytes)
+  (declare (xargs :guard t :verify-guards nil))
+  (+ (nfix (first bytes))
+     (ash (nfix (second bytes)) 8)))
+
+;; Little-endian: 8 bytes → u64 (already have le-bytes-to-u64 for i64.load)
+
+;; Sign-extend 8-bit value to 32-bit
+(defun sign-extend-8-to-32 (b)
+  (declare (xargs :guard t :verify-guards nil))
+  (let ((b (logand (nfix b) #xFF)))
+    (if (>= b 128) (- (expt 2 32) (- 256 b)) b)))
+
+;; Sign-extend 16-bit value to 32-bit
+(defun sign-extend-16-to-32 (h)
+  (declare (xargs :guard t :verify-guards nil))
+  (let ((h (logand (nfix h) #xFFFF)))
+    (if (>= h 32768) (- (expt 2 32) (- 65536 h)) h)))
+
+;; Sign-extend 8-bit value to 64-bit
+(defun sign-extend-8-to-64 (b)
+  (declare (xargs :guard t :verify-guards nil))
+  (let ((b (logand (nfix b) #xFF)))
+    (if (>= b 128) (- (expt 2 64) (- 256 b)) b)))
+
+;; Sign-extend 16-bit value to 64-bit
+(defun sign-extend-16-to-64 (h)
+  (declare (xargs :guard t :verify-guards nil))
+  (let ((h (logand (nfix h) #xFFFF)))
+    (if (>= h 32768) (- (expt 2 64) (- 65536 h)) h)))
+
+;; Sign-extend 32-bit value to 64-bit
+(defun sign-extend-32-to-64 (w)
+  (declare (xargs :guard t :verify-guards nil))
+  (let ((w (logand (nfix w) #xFFFFFFFF)))
+    (if (>= w (expt 2 31)) (- (expt 2 64) (- (expt 2 32) w)) w)))
+
 ;; Update state memory
 (defun update-memory (memory state)
   (declare (xargs :guard (and (byte-listp memory) (statep state))
@@ -1636,6 +1690,96 @@
        (state (update-memory new-memory state))
        (state (update-current-operand-stack ostack state)))
     (advance-instrs state)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Packed memory loads/stores (M4b)
+;;
+;; i32.load8_u, i32.load8_s, i32.load16_u, i32.load16_s
+;; i32.store8, i32.store16
+;; i64.load8_u/s, i64.load16_u/s, i64.load32_u/s
+;; i64.store8, i64.store16, i64.store32
+
+;; Macro for packed loads: read N bytes, zero-extend or sign-extend to result
+(defmacro def-packed-load (name byte-count result-maker)
+  `(defun ,name (args state)
+     (declare (xargs :guard (statep state) :verify-guards nil))
+     (b* ((offset (first args))
+          (ostack (current-operand-stack state))
+          ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
+          (base-val (top-operand ostack))
+          ((when (not (i32-valp base-val))) :trap)
+          (base (farg1 base-val))
+          (addr (+ base (nfix offset)))
+          (memory (state->memory state))
+          ((when (< (len memory) (+ addr ,byte-count))) :trap)
+          (bytes (mem-read-bytes ,byte-count addr memory))
+          (result ,result-maker)
+          (ostack (pop-operand ostack))
+          (ostack (push-operand result ostack))
+          (state (update-current-operand-stack ostack state)))
+       (advance-instrs state))))
+
+;; i32 packed loads
+(def-packed-load execute-i32.load8_u  1
+  (make-i32-val (nfix (first bytes))))
+(def-packed-load execute-i32.load8_s  1
+  (make-i32-val (sign-extend-8-to-32 (first bytes))))
+(def-packed-load execute-i32.load16_u 2
+  (make-i32-val (le-bytes-to-u16 bytes)))
+(def-packed-load execute-i32.load16_s 2
+  (make-i32-val (sign-extend-16-to-32 (le-bytes-to-u16 bytes))))
+
+;; i64 packed loads
+(def-packed-load execute-i64.load8_u  1
+  (make-i64-val (nfix (first bytes))))
+(def-packed-load execute-i64.load8_s  1
+  (make-i64-val (sign-extend-8-to-64 (first bytes))))
+(def-packed-load execute-i64.load16_u 2
+  (make-i64-val (le-bytes-to-u16 bytes)))
+(def-packed-load execute-i64.load16_s 2
+  (make-i64-val (sign-extend-16-to-64 (le-bytes-to-u16 bytes))))
+(def-packed-load execute-i64.load32_u 4
+  (make-i64-val (le-bytes-to-u32 bytes)))
+(def-packed-load execute-i64.load32_s 4
+  (make-i64-val (sign-extend-32-to-64 (le-bytes-to-u32 bytes))))
+
+;; Macro for packed stores: pop value, truncate, write N bytes
+(defmacro def-packed-store (name byte-count val-pred val-extract)
+  `(defun ,name (args state)
+     (declare (xargs :guard (statep state) :verify-guards nil))
+     (b* ((offset (first args))
+          (ostack (current-operand-stack state))
+          ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
+          (val-val (top-operand ostack))
+          ((when (not (,val-pred val-val))) :trap)
+          (val ,val-extract)
+          (ostack (pop-operand ostack))
+          (base-val (top-operand ostack))
+          ((when (not (i32-valp base-val))) :trap)
+          (base (farg1 base-val))
+          (ostack (pop-operand ostack))
+          (addr (+ base (nfix offset)))
+          (memory (state->memory state))
+          ((when (< (len memory) (+ addr ,byte-count))) :trap)
+          (bytes (case ,byte-count
+                   (1 (list (logand val #xFF)))
+                   (2 (list (logand val #xFF) (logand (ash val -8) #xFF)))
+                   (4 (list (logand val #xFF) (logand (ash val -8) #xFF)
+                            (logand (ash val -16) #xFF) (logand (ash val -24) #xFF)))
+                   (otherwise nil)))
+          (new-memory (mem-write-bytes bytes addr memory))
+          (state (update-memory new-memory state))
+          (state (update-current-operand-stack ostack state)))
+       (advance-instrs state))))
+
+;; i32 packed stores
+(def-packed-store execute-i32.store8  1 i32-valp (farg1 val-val))
+(def-packed-store execute-i32.store16 2 i32-valp (farg1 val-val))
+
+;; i64 packed stores
+(def-packed-store execute-i64.store8  1 i64-valp (farg1 val-val))
+(def-packed-store execute-i64.store16 2 i64-valp (farg1 val-val))
+(def-packed-store execute-i64.store32 4 i64-valp (farg1 val-val))
 
 ;; memory.size: push current memory size in pages
 (defun execute-memory.size (state)
@@ -1890,6 +2034,22 @@
       (:i32.store (execute-i32.store args state))
       (:i64.load (execute-i64.load args state))
       (:i64.store (execute-i64.store args state))
+      ;; Packed memory (M4b)
+      (:i32.load8_u  (execute-i32.load8_u args state))
+      (:i32.load8_s  (execute-i32.load8_s args state))
+      (:i32.load16_u (execute-i32.load16_u args state))
+      (:i32.load16_s (execute-i32.load16_s args state))
+      (:i32.store8   (execute-i32.store8 args state))
+      (:i32.store16  (execute-i32.store16 args state))
+      (:i64.load8_u  (execute-i64.load8_u args state))
+      (:i64.load8_s  (execute-i64.load8_s args state))
+      (:i64.load16_u (execute-i64.load16_u args state))
+      (:i64.load16_s (execute-i64.load16_s args state))
+      (:i64.load32_u (execute-i64.load32_u args state))
+      (:i64.load32_s (execute-i64.load32_s args state))
+      (:i64.store8   (execute-i64.store8 args state))
+      (:i64.store16  (execute-i64.store16 args state))
+      (:i64.store32  (execute-i64.store32 args state))
       (:memory.size (execute-memory.size state))
       (:memory.grow (execute-memory.grow state))
       (otherwise (prog2$ (cw "Unhandled instr: ~x0.~%" instr)

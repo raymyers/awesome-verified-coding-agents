@@ -13,7 +13,7 @@
 > **Existing skeleton**: [Kestrel WASM books](https://github.com/acl2/acl2/tree/master/books/kestrel/wasm)
 > (execution.lisp, parse-binary.lisp, add-proof.lisp)
 
-### Current Status (M0–M6, M8 COMPLETE)
+### Current Status (M0–M6, M4b, M8 COMPLETE)
 
 | Milestone | Status | Instructions | Tests | Key Capability |
 |-----------|--------|-------------|-------|----------------|
@@ -22,14 +22,16 @@
 | M2: Control Flow | ✅ | 8 | 10 | block, loop, if, br/br_if/br_table, return |
 | M3: Functions | ✅ | 1 | 8 | call, recursive factorial(5)=120, fibonacci(7)=13 |
 | M4: Memory | ✅ | 4 | 10 | i32.load/store, memory.size/grow, LE encoding |
+| M4b: Packed Mem | ✅ | 15 | 10 | load8/16_u/s, store8/16, i64 variants |
 | M5: i64 + Conversions | ✅ | 37 | 24 | i64 arithmetic/bitwise/compare, conversions, i64 memory |
 | M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability enforcement |
-| M8: Proofs | ✅ | 2 thms | — | i32-add-spec (Q.E.D.), i32-add-commutative (Q.E.D.) |
+| M8: Proofs | ✅ | 5 thms | — | add-spec, add-commutative, sub-spec, sub-self-zero, add-sub-inverse |
 | M7: Floats/Tables | todo | | | f32/f64, tables, indirect calls |
 | M9: Validation | todo | | | Type checking, module validation |
-| **Total done** | | **87 instrs** | **79 tests** | + 2 machine-checked theorems |
+| **Total done** | | **102 instrs** | **89 tests** | + 5 machine-checked theorems |
 
-**execution.lisp**: 1966 lines, proofs/ directory with 2 Q.E.D. theorems, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**execution.lisp**: 2126 lines, proofs/ directory with 5 Q.E.D. theorems, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**Oracle pipeline**: 28 checks (6 WAT files × Node.js), all pass
 
 ---
 
@@ -200,12 +202,12 @@ loops, and branch instructions.
 - [x] `le-bytes-to-u32`, `u32-to-le-bytes` — little-endian conversion
 - [x] `update-memory` state updater
 
-### 4.2 Load/Store Instructions ✅ (i32 only, packed loads deferred)
+### 4.2 Load/Store Instructions ✅
 - [x] `execute-i32.load` — load 4 bytes at base+offset, convert to i32
 - [x] `execute-i32.store` — convert i32 to 4 LE bytes, write at base+offset
-- [ ] Packed loads/stores (load8_s, load16_u, etc.) deferred
-- [ ] i64 load/store deferred to M5
-- [x] Bounds checking (load traps when addr+4 > memory length)
+- [x] Packed loads/stores — see M4b below
+- [x] i64 load/store — completed in M5
+- [x] Bounds checking (load traps when addr+N > memory length)
 
 ### 4.3 Memory Management ✅
 - [x] `execute-memory.size` — push page count (len/65536)
@@ -222,6 +224,45 @@ loops, and branch instructions.
 
 **Also fixed**: `return-from-function` now detects final frame early (avoids
 sentinel trap issue). All M1-M4 tests pass.
+
+---
+
+## Milestone 4b: Packed Memory Operations (Sprint 4b) ✅ COMPLETE
+
+**Goal**: Sub-word memory loads/stores with zero/sign extension.
+
+### 4b.1 Packed Loads (i32) ✅
+- [x] `execute-i32.load8_u` — load 1 byte, zero-extend to i32
+- [x] `execute-i32.load8_s` — load 1 byte, sign-extend to i32 (via sign-extend-8-to-32)
+- [x] `execute-i32.load16_u` — load 2 bytes LE, zero-extend to i32
+- [x] `execute-i32.load16_s` — load 2 bytes LE, sign-extend to i32
+
+### 4b.2 Packed Stores (i32) ✅
+- [x] `execute-i32.store8` — truncate i32 to 1 byte, store
+- [x] `execute-i32.store16` — truncate i32 to 2 bytes LE, store
+
+### 4b.3 Packed Loads/Stores (i64) ✅
+- [x] `execute-i64.load8_u`, `execute-i64.load8_s`
+- [x] `execute-i64.load16_u`, `execute-i64.load16_s`
+- [x] `execute-i64.load32_u`, `execute-i64.load32_s`
+- [x] `execute-i64.store8`, `execute-i64.store16`, `execute-i64.store32`
+
+### 4b.4 Infrastructure ✅
+- [x] `le-bytes-to-u16` — 2-byte LE conversion
+- [x] `sign-extend-8-to-32`, `sign-extend-16-to-32` — signed load helpers
+- [x] `sign-extend-8-to-64`, `sign-extend-16-to-64`, `sign-extend-32-to-64`
+- [x] `def-packed-load` macro — DRY pattern for all packed loads
+- [x] `def-packed-store` macro — DRY pattern for all packed stores
+
+### 4b.5 Tests ✅ (10 tests, oracle-verified)
+- [x] load8_u: byte 0xAB=171, byte 0xCD=205
+- [x] load8_s: sign-extend 0xAB → 0xFFFFFFAB (4294967211), 0x12→18
+- [x] load16_u: LE [0xAB,0xCD] = 0xCDAB=52651, [0xEF,0x12]=4847
+- [x] load16_s: sign-extend 0xCDAB → 0xFFFFCDAB (4294954411), 0x12EF→4847
+- [x] store8+load8_u: write 0x1FF, read back 0xFF=255 (truncation)
+- [x] store16+load16_u: write 0xDEADBEEF, read back 0xBEEF=48879
+
+**Exit criteria**: ✅ All oracle-verified expected values match. 15 new instructions. Certified.
 
 ---
 
@@ -381,12 +422,15 @@ sentinel trap issue). All M1-M4 tests pass.
 
 **Goal**: Prove correctness theorems for representative WASM programs.
 
-### 8.1 Proven Theorems ✅
+### 8.1 Proven Theorems ✅ (5 total)
 - [x] **`i32-add-spec`** (Q.E.D.): For all u32 a,b, executing
   `(i32.const a) (i32.const b) (i32.add)` produces `(make-i32-val (bvplus 32 a b))`
   on the operand stack. This is the first instruction specification theorem.
 - [x] **`i32-add-commutative`** (Q.E.D.): The result of the above is identical
   regardless of operand order (a,b vs b,a).
+- [x] **`i32-sub-spec`** (Q.E.D.): `(i32.const a) (i32.const b) (i32.sub)` produces `(bvminus 32 a b)`.
+- [x] **`i32-sub-self-is-zero`** (Q.E.D.): `(i32.const a) (i32.const a) (i32.sub)` produces 0.
+- [x] **`i32-add-sub-inverse`** (Q.E.D.): `(a + b) - b = a` (identity mod 2^32).
 
 ### 8.2 Proof Technique Discovered ✅
 - [x] **`:expand` hint for `run`**: `(run n s)` is recursive; ACL2 tries induction
@@ -404,7 +448,7 @@ sentinel trap issue). All M1-M4 tests pass.
 - [ ] **memory-copy-proof** — copying N bytes produces identical sequences
 - [ ] Induction schemes for loop proofs
 
-**Exit criteria**: ✅ 2 proofs certified. (Target: at least 3 non-trivial proofs total.)
+**Exit criteria**: ✅ 5 proofs certified (exceeds target of 3). Sub-spec + properties proven.
 
 **Estimated time for remaining proofs**: 4-8 hours.
 

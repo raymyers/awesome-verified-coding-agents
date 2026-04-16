@@ -61,6 +61,23 @@ const prime = await load('is_prime');
   if (!check(`is_prime(${n})`, prime.is_prime(n), exp)) failures++;
 });
 
+// --- packed_mem ---
+const pm = await load('packed_mem');
+[
+  ['load8_u(0)', pm.load8_u(0), 171],
+  ['load8_u(1)', pm.load8_u(1), 205],
+  ['load8_s(0)', pm.load8_s(0), -85],
+  ['load8_s(3)', pm.load8_s(3), 18],
+  ['load16_u(0)', pm.load16_u(0), 52651],
+  ['load16_u(2)', pm.load16_u(2), 4847],
+  ['load16_s(0)', pm.load16_s(0), -12885],
+  ['load16_s(2)', pm.load16_s(2), 4847],
+  ['store8(16,0x1FF)', pm.store8_load(16, 0x1FF), 255],
+  ['store16(20,0xDEADBEEF)', pm.store16_load(20, 0xDEADBEEF), 48879],
+].forEach(([label, actual, expected]) => {
+  if (!check(label, actual, expected)) failures++;
+});
+
 console.log('');
 if (failures === 0) {
   console.log('=== ALL ORACLE CHECKS PASSED ===');
