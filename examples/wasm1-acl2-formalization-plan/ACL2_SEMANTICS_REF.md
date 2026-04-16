@@ -684,3 +684,41 @@ From `7-module.watsup`:
 ```
 allocglobal(s, globaltype, val) = s[.GLOBAL =.. { TYPE globaltype, VALUE val }]
 ```
+
+---
+
+## M8: Proof Strategy
+
+### Key Insight: `:expand` Hint for `run`
+The `run` function is recursive on step count `n`. When `n` is a concrete literal 
+(like 3), ACL2 should just unfold it. But the rewriter doesn't do this automatically — 
+it tries induction instead.
+
+**Solution**: Use the `:expand` hint:
+```lisp
+:expand ((:free (n s) (run n s)))
+```
+This tells ACL2 to expand every `(run n s)` call it encounters, which for small
+concrete `n` gives direct symbolic evaluation.
+
+### Theory for Proofs
+All `defund` functions must be explicitly enabled. Key ones:
+- `execute-instr`, `execute-i32.const`, `execute-i32.add` (instruction semantics)
+- `current-frame`, `current-instrs`, `current-operand-stack`, etc. (state accessors)
+- `update-current-operand-stack`, `update-current-instrs` (state updaters)
+- `complete-label`, `return-from-function` (control flow)
+- `push-operand`, `top-operand`, `pop-operand`, etc. (operand stack)
+- `make-i32-val`, `i32-valp`, `valp`, `i64-valp`, `u32p`, `u64p` (type recognizers)
+- `instrp`, `i32-const-argsp`, `no-argsp` (instruction validation)
+
+### Macros Cannot Be Enabled
+These are macros (expand to `car`/`rest`/etc.):
+- `ffn-symb` — `(car x)`, from ACL2 term utilities
+- `advance-instrs` — `(update-current-instrs (rest (current-instrs state)) state)`
+
+Do NOT include macros in `(enable ...)` lists — ACL2 gives a theory error.
+
+### Commutativity Proof Pattern
+For `i32-add-commutative`, the same `:expand` technique works because both sides
+reduce to `(bvplus 32 a b)` and `(bvplus 32 b a)` respectively, and the BV library
+has `bvplus` commutativity built in.
