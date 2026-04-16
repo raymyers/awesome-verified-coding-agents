@@ -20,7 +20,7 @@
                                                   :operand-stack (empty-operand-stack)
                                                   :instrs ,instrs
                                                   :label-stack nil))
-                    :memory nil)))
+                    :memory nil :globals nil)))
 
 (defmacro check-result (steps locals instrs expected)
   `(assert-event (equal (get-result (run-wasm ,steps ,locals ,instrs)) ,expected)))
@@ -117,7 +117,7 @@
                                                                    (:i32.const 0)
                                                                    (:i64.load 0))
                                                         :label-stack nil))
-                          :memory (make-list 16 :initial-element 0))))
+                          :globals nil :memory (make-list 16 :initial-element 0))))
         (make-i64-val 1234567890123456789)))
 
 ;; === Mixed i32/i64 program: use i64 arithmetic then wrap to i32 ===

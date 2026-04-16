@@ -651,3 +651,36 @@ books/kestrel/wasm/
 - **Kestrel BV library**: `https://github.com/acl2/acl2/tree/master/books/kestrel/bv`
 - **ACL2 documentation**: `https://www.cs.utexas.edu/users/moore/acl2/manuals/current/manual/`
 - **defaggregate**: `https://www.cs.utexas.edu/users/moore/acl2/manuals/current/manual/?topic=STD____DEFAGGREGATE`
+
+---
+
+## M5+/M6: Globals and Loop Fallthrough Fix
+
+### Global Variables (SpecTec: `globalinst`)
+- `globalinst` = `(mutability value)` where mutability ∈ {`:const`, `:var`}
+- `global.get x` — push `globals[x].value` onto operand stack
+- `global.set x` — pop value, store into `globals[x].value` (trap if `:const`)
+- Out-of-bounds access traps
+- Both i32 and i64 values supported in globals
+- Added `globals` field to `state` aggregate (alongside `store`, `call-stack`, `memory`)
+
+### Loop Fallthrough Fix (Bug found during globals testing)
+When a loop body completes **without** a `br` instruction re-entering it, the 
+`complete-label` function must skip the loop instruction in the continuation.
+
+- **Problem**: loop's continuation was `(cons loop-instr rest-instrs)` for both
+  `br` re-entry AND fallthrough. On fallthrough, this incorrectly re-entered the loop.
+- **Fix**: in `complete-label`, when `is-loop` is true, use `(rest continuation)` 
+  (skipping the loop instruction) instead of the full continuation.
+- This is a critical correctness fix — without it, finite loops that exit via 
+  condition check (br_if not firing) would loop forever.
+
+### SpecTec Reference for Globals
+From `6-runtime.watsup`:
+```
+globalinst ::= { TYPE globaltype, VALUE val }
+```
+From `7-module.watsup`:
+```
+allocglobal(s, globaltype, val) = s[.GLOBAL =.. { TYPE globaltype, VALUE val }]
+```

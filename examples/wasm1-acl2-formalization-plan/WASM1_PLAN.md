@@ -22,11 +22,12 @@
 | M2: Control Flow | ✅ | 8 | 10 | block, loop, if, br/br_if/br_table, return |
 | M3: Functions | ✅ | 1 | 8 | call, recursive factorial(5)=120, fibonacci(7)=13 |
 | M4: Memory | ✅ | 4 | 10 | i32.load/store, memory.size/grow, LE encoding |
-| **Total** | | **85 instrs** | **72 tests** | |
+| **Total** | | **87 instrs** | **79 tests** | |
 | M5: i64 + Conversions | ✅ | 37 | 24 | i64 arithmetic/bitwise/compare, conversions, i64 memory |
-| M6–M8 | todo | | | Floats, tables, globals, proofs |
+| M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability check |
+| M7–M8 | todo | | | Floats, tables, proofs |
 
-**execution.lisp**: 1897 lines, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**execution.lisp**: 1966 lines, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
 
 ---
 

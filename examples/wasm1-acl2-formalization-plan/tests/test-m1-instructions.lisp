@@ -17,7 +17,7 @@
                                                   :operand-stack (empty-operand-stack)
                                                   :instrs nil
                                                   :label-stack nil))
-                    :memory nil)))
+                    :memory nil :globals nil)))
 
 (defun get-result (r)
   (declare (xargs :guard t :verify-guards nil))
