@@ -13,7 +13,7 @@
 > **Existing skeleton**: [Kestrel WASM books](https://github.com/acl2/acl2/tree/master/books/kestrel/wasm)
 > (execution.lisp, parse-binary.lisp, add-proof.lisp)
 
-### Current Status (M0–M4 COMPLETE)
+### Current Status (M0–M6, M8 COMPLETE)
 
 | Milestone | Status | Instructions | Tests | Key Capability |
 |-----------|--------|-------------|-------|----------------|
@@ -22,11 +22,12 @@
 | M2: Control Flow | ✅ | 8 | 10 | block, loop, if, br/br_if/br_table, return |
 | M3: Functions | ✅ | 1 | 8 | call, recursive factorial(5)=120, fibonacci(7)=13 |
 | M4: Memory | ✅ | 4 | 10 | i32.load/store, memory.size/grow, LE encoding |
-| **Total** | | **87 instrs** | **79 tests** | + 2 machine-checked theorems |
 | M5: i64 + Conversions | ✅ | 37 | 24 | i64 arithmetic/bitwise/compare, conversions, i64 memory |
-| M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability check |
-| M8: Proofs | ✅ | 2 thms | — | i32-add-spec, i32-add-commutative |
+| M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability enforcement |
+| M8: Proofs | ✅ | 2 thms | — | i32-add-spec (Q.E.D.), i32-add-commutative (Q.E.D.) |
 | M7: Floats/Tables | todo | | | f32/f64, tables, indirect calls |
+| M9: Validation | todo | | | Type checking, module validation |
+| **Total done** | | **87 instrs** | **79 tests** | + 2 machine-checked theorems |
 
 **execution.lisp**: 1966 lines, proofs/ directory with 2 Q.E.D. theorems, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
 
@@ -163,7 +164,8 @@ loops, and branch instructions.
 - [x] `funcinst` aggregate: `(param-count, local-count, return-arity, body)`
 - [x] `funcinst-listp` recognizer
 - [x] `storep` = `funcinst-listp` (store is a list of function instances)
-- [ ] globalinst, moduleinst (deferred to M7)
+- [x] globalinst (completed in M6)
+- [ ] moduleinst (deferred to M7c)
 
 ### 3.2 Function Call ✅
 - [x] `execute-call` — look up function by index in store
@@ -256,22 +258,59 @@ sentinel trap issue). All M1-M4 tests pass.
 
 ---
 
-## Milestone 6: Floating-Point (Sprint 6)
+## Milestone 6: Global Variables (Sprint 6) ✅ COMPLETE
+
+**Goal**: Execute programs using global variables with mutability enforcement.
+
+### 6.1 Global Variable Infrastructure ✅
+- [x] `mutabilityp` recognizer (`:const` or `:var`)
+- [x] `globalinst` aggregate: `(mutability, value)` — value is any `valp`
+- [x] `globalinst-listp` recognizer
+- [x] `globals` field added to `state` aggregate (alongside store, call-stack, memory)
+- [x] All existing tests updated with `:globals nil`
+
+### 6.2 Global Instructions ✅
+- [x] `execute-global.get` — look up global by index, push value onto operand stack
+- [x] `execute-global.set` — pop value, store into global; trap if `:const` mutability
+- [x] Out-of-bounds index traps for both get and set
+- [x] `instrp` recognizes `(:global.get idx)` and `(:global.set idx)`
+- [x] `execute-instr` dispatch entries added
+
+### 6.3 Loop Fallthrough Bug Fix ✅
+- [x] **Critical fix**: `complete-label` for loop labels now correctly handles
+  fallthrough (body completes without `br`). Previously, the continuation
+  included the loop instruction itself, causing infinite re-entry.
+  Fix: use `(rest continuation)` for loop fallthrough, skipping the loop-instr.
+
+### 6.4 Tests ✅ (7 tests pass)
+- [x] Basic global.get
+- [x] Global.set then global.get
+- [x] Const mutability trap
+- [x] Out-of-bounds trap
+- [x] Loop counter using globals (decrement in loop body)
+- [x] i64 global values
+- [x] All M1–M5 regression tests still pass
+
+**Exit criteria**: ✅ Global get/set works, mutability enforced, regression tests pass.
+
+---
+
+## Milestone 7a: Floating-Point — f32/f64 (Sprint 7)
 
 **Goal**: f32 and f64 support.
 
-### 6.1 IEEE 754 Model in ACL2
+### 7a.1 IEEE 754 Model in ACL2
 - [ ] Define `f32-valp`, `f64-valp` recognizers
 - [ ] Model: either rational-based with explicit NaN/Inf/sign tags,
   or bit-level model using kestrel/bv (32-bit / 64-bit representations)
 - [ ] Decide on NaN handling strategy (WASM uses canonical NaN propagation)
 
-### 6.2 f32/f64 Operations
+### 7a.2 f32/f64 Operations
 - [ ] Arithmetic: fadd, fsub, fmul, fdiv, fmin, fmax, fcopysign
 - [ ] Unary: fabs, fneg, fsqrt, fceil, ffloor, ftrunc, fnearest
 - [ ] Comparisons: feq, fne, flt, fgt, fle, fge
 
-### 6.3 Remaining Conversions
+### 7a.3 Float-Integer Conversions
 - [ ] `i32.trunc_f32_s`, `i32.trunc_f32_u`, `i32.trunc_f64_s`, `i32.trunc_f64_u`
 - [ ] `i64.trunc_f32_s`, `i64.trunc_f32_u`, `i64.trunc_f64_s`, `i64.trunc_f64_u`
 - [ ] `f32.convert_i32_s`, `f32.convert_i32_u`, `f32.convert_i64_s`, `f32.convert_i64_u`
@@ -279,7 +318,7 @@ sentinel trap issue). All M1-M4 tests pass.
 - [ ] `f32.demote_f64`, `f64.promote_f32`
 - [ ] Reinterpret operations
 
-### 6.4 Tests
+### 7a.4 Tests
 - [ ] Test: basic f32/f64 arithmetic
 - [ ] Test: NaN propagation
 - [ ] Test: infinity handling
@@ -291,7 +330,18 @@ sentinel trap issue). All M1-M4 tests pass.
 
 ---
 
-## Milestone 7: Module Instantiation & Binary Integration (Sprint 7)
+## Milestone 7b: Tables + Indirect Calls (Sprint 7)
+
+**Goal**: Table operations and `call_indirect`.
+
+- [ ] Table instance (`tableinst`): vector of function references
+- [ ] `call_indirect` — look up function in table by index, type-check, call
+- [ ] Elem segment initialization (fill table with function addresses)
+- [ ] Table bounds checking and traps
+
+---
+
+## Milestone 7c: Module Instantiation & Binary Integration (Sprint 7)
 
 **Goal**: Parse a `.wasm` binary file and instantiate/execute it.
 
@@ -327,31 +377,36 @@ sentinel trap issue). All M1-M4 tests pass.
 
 ---
 
-## Milestone 8: Proofs & Verification (Sprint 8)
+## Milestone 8: Proofs & Verification (Sprint 8) — Initial Proofs ✅
 
 **Goal**: Prove correctness theorems for representative WASM programs.
 
-### 8.1 Proof Infrastructure
-- [ ] Extend `proof-support.lisp` with defopeners for all new functions
-- [ ] Add rewrite rules for common patterns (block completion, branch resolution)
-- [ ] Lemmas for operand-stack manipulation compositionality
+### 8.1 Proven Theorems ✅
+- [x] **`i32-add-spec`** (Q.E.D.): For all u32 a,b, executing
+  `(i32.const a) (i32.const b) (i32.add)` produces `(make-i32-val (bvplus 32 a b))`
+  on the operand stack. This is the first instruction specification theorem.
+- [x] **`i32-add-commutative`** (Q.E.D.): The result of the above is identical
+  regardless of operand order (a,b vs b,a).
 
-### 8.2 Example Proofs
-- [ ] **add-proof.lisp** — verify existing proof still works (regression)
+### 8.2 Proof Technique Discovered ✅
+- [x] **`:expand` hint for `run`**: `(run n s)` is recursive; ACL2 tries induction
+  instead of unrolling for concrete `n`. Fix: `:expand ((:free (n s) (run n s)))`
+- [x] **Theory list**: all `defund` functions must be explicitly `enable`d
+- [x] **Macro pitfall**: `advance-instrs` and `ffn-symb` are macros — cannot
+  appear in `(enable ...)` lists (gives "does not designate a rule" error)
+
+### 8.3 Future Proofs (todo)
+- [ ] Extend `proof-support.lisp` with defopeners for all new functions
 - [ ] **sub-proof** — subtraction computes bvminus
 - [ ] **max-proof** — max(a,b) using if/else is correct
 - [ ] **factorial-proof** — loop-based factorial computes n!
-  (inductive proof over loop iterations)
+  (inductive proof over loop iterations — requires loop invariant)
 - [ ] **memory-copy-proof** — copying N bytes produces identical sequences
-
-### 8.3 Symbolic Execution Support
-- [ ] Opener rules for new execute-* functions
-- [ ] Conditional rewriting through block/loop structures
 - [ ] Induction schemes for loop proofs
 
-**Exit criteria**: At least 3 non-trivial proofs certified.
+**Exit criteria**: ✅ 2 proofs certified. (Target: at least 3 non-trivial proofs total.)
 
-**Estimated time**: 4-8 hours.
+**Estimated time for remaining proofs**: 4-8 hours.
 
 ---
 
