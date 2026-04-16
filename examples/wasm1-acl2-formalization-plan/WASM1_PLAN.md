@@ -22,10 +22,11 @@
 | M2: Control Flow | ✅ | 8 | 10 | block, loop, if, br/br_if/br_table, return |
 | M3: Functions | ✅ | 1 | 8 | call, recursive factorial(5)=120, fibonacci(7)=13 |
 | M4: Memory | ✅ | 4 | 10 | i32.load/store, memory.size/grow, LE encoding |
-| **Total** | | **48 instrs** | **48 tests** | |
-| M5–M8 | todo | | | i64, tables, globals, proofs |
+| **Total** | | **85 instrs** | **72 tests** | |
+| M5: i64 + Conversions | ✅ | 37 | 24 | i64 arithmetic/bitwise/compare, conversions, i64 memory |
+| M6–M8 | todo | | | Floats, tables, globals, proofs |
 
-**execution.lisp**: 1493 lines, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**execution.lisp**: 1897 lines, certifies cleanly with ACL2 8.7 + SBCL 2.5.2
 
 ---
 
@@ -220,36 +221,36 @@ sentinel trap issue). All M1-M4 tests pass.
 
 ---
 
-## Milestone 5: i64 + Conversions (Sprint 5)
+## Milestone 5: i64 + Conversions + i64 Memory (Sprint 5) ✅ COMPLETE
 
 **Goal**: Full integer support with 64-bit operations and type conversions.
 
-### 5.1 i64 Operations
-- [ ] All i64 arithmetic: add, sub, mul, div_u, div_s, rem_u, rem_s
-  (mirror i32 implementations with `64` instead of `32`)
-- [ ] All i64 bitwise: and, or, xor, shl, shr_u, shr_s, rotl, rotr, clz, ctz, popcnt
-- [ ] All i64 comparisons: eqz, eq, ne, lt_u, lt_s, gt_u, gt_s, le_u, le_s, ge_u, ge_s
-- [ ] i64.const
+### 5.1 i64 Operations ✅
+- [x] All i64 arithmetic: add, sub, mul, div_u, div_s, rem_u, rem_s
+- [x] All i64 bitwise: and, or, xor, shl, shr_u, shr_s, rotl, rotr, clz, ctz, popcnt
+- [x] All i64 comparisons: eqz, eq, ne, lt_u, lt_s, gt_u, gt_s, le_u, le_s, ge_u, ge_s
+- [x] i64.const
+- [x] i64.load, i64.store (8-byte LE)
 
-### 5.2 Conversion Operations (SpecTec 3-numerics: `$cvtop__`)
-- [ ] `i32.wrap_i64` — `(bvchop 32 x)` (truncate 64→32)
-- [ ] `i64.extend_i32_u` — zero-extend 32→64 (identity on unsigned-byte-p 32)
-- [ ] `i64.extend_i32_s` — `(bvsx 64 32 x)` sign-extend
-- [ ] `i32.trunc_f32_s`, `i32.trunc_f32_u` — (defer if f32 not yet done)
-- [ ] `i32.reinterpret_f32`, `i64.reinterpret_f64` — (defer if float not done)
-- [ ] `f32.reinterpret_i32`, `f64.reinterpret_i64` — (defer if float not done)
+### 5.2 Conversion Operations ✅
+- [x] `i32.wrap_i64` — `(bvchop 32 x)` (truncate 64→32)
+- [x] `i64.extend_i32_u` — zero-extend 32→64
+- [x] `i64.extend_i32_s` — `(bvsx 64 32 x)` sign-extend
+- [ ] `i32.trunc_f32_s`, `i32.trunc_f32_u` — deferred (float not done)
+- [ ] Reinterpret ops — deferred (float not done)
 
-### 5.3 Tests for Milestone 5
-- [ ] Test: i64 add, sub, mul
-- [ ] Test: i64 div_u with trap on zero
-- [ ] Test: i64 bit operations
-- [ ] Test: i32.wrap_i64 truncation
-- [ ] Test: i64.extend_i32_s sign extension (negative value)
-- [ ] Test: mixed i32/i64 program
+### 5.3 Tests ✅ (24 tests pass)
+- [x] i64 add, sub, mul (big numbers beyond u32 range)
+- [x] i64 div_u with trap on zero
+- [x] i64 bitwise: and, or, xor, shl
+- [x] i64 unary: clz, popcnt
+- [x] i64 comparison: eqz (0 and nonzero), eq, lt_u → i32 results
+- [x] i32.wrap_i64 truncation (0x100000001 → 1)
+- [x] i64.extend_i32_u, i64.extend_i32_s (positive + negative)
+- [x] i64 memory load/store roundtrip (1234567890123456789)
+- [x] Mixed i32/i64 program
 
-**Exit criteria**: All i32 and i64 operations work. Conversions between them work.
-
-**Estimated time**: 2-3 hours.
+**Exit criteria**: ✅ All i32 and i64 operations work. Conversions between them work.
 
 ---
 
