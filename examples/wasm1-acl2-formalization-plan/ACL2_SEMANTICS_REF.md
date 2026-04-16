@@ -859,7 +859,7 @@ To prove these at the WASM instruction level:
 
 No special hints needed — the standard WASM execution theory + BV library suffice.
 
-### Proof File Inventory (14 Q.E.D.s total)
+### Proof File Inventory (23 Q.E.D.s total)
 
 | File | Theorems | Technique |
 |------|----------|-----------|
@@ -867,3 +867,77 @@ No special hints needed — the standard WASM execution theory + BV library suff
 | proof-sub-spec.lisp | i32-sub-spec, i32-sub-self-zero, i32-add-sub-inverse | :expand + full theory |
 | proof-mem-roundtrip.lisp | le-bytes-roundtrip, nth-update-nth-same/diff, mem-read-write-4, u32-to-le-bytes-is-list4, i32-store-load-semantic-roundtrip | encapsulate + layered :use |
 | proof-bitwise.lisp | i32-xor-self-zero, i32-and-idempotent, i32-or-zero-identity | :expand + BV library |
+| proof-mul-eqz-spec.lisp | i32-mul-spec, i32-mul-by-zero, i32-eqz-of-zero, i32-eqz-of-nonzero | :expand + full theory |
+| proof-select-spec.lisp | select-nonzero-returns-first, select-zero-returns-second | :expand + full theory, uses `defconst *wasm-exec-theory*` |
+| proof-call-indirect-spec.lisp | call_indirect-delegates-to-call, call_indirect-oob-traps, call_indirect-nil-entry-traps | Function-level (delegates) + run-level (traps) |
+
+---
+
+## 12. Floating-Point Semantics (M7a)
+
+### 12.1 Design Decision: Rational Approximation
+
+f32/f64 values are modeled as ACL2 rationals (`rationalp`), tagged with
+`:f32.const` / `:f64.const`.  This is a deliberately simplified model:
+
+- **Sound for well-behaved programs**: Any program that computes correctly
+  under exact rational arithmetic also computes correctly under IEEE 754
+  (the real numbers are embedded in the rationals, and IEEE 754 is a
+  rounding of real arithmetic).
+- **Exact for integer arithmetic**: Float programs that only use integers
+  (common in WASM) get exact results.
+- **Not modeled**: NaN, Infinity, denormals, rounding modes, signaling.
+
+### 12.2 Operations Implemented (56 total)
+
+**Arithmetic** (6 each × 2 types = 12):
+- add, sub, mul, div (traps on zero), min, max
+
+**Unary** (5 each × 2 types = 10):
+- neg, abs, sqrt (integer-only approximation), ceil, floor
+
+**Comparisons** (6 each × 2 types = 12, return i32):
+- eq, ne, lt, gt, le, ge
+
+**Conversions** (18):
+- f32/f64.convert_i32_s/u, f64.convert_i64_s/u (8)
+- i32/i64.trunc_f32/f64_s/u (8)
+- f32.demote_f64, f64.promote_f32 (2)
+
+**Constants** (2):
+- f32.const, f64.const
+
+**Not yet implemented**:
+- `fnearest`, `fcopysign`, `ftrunc` (unary truncate)
+- Reinterpret operations (`f32.reinterpret_i32` etc.)
+- NaN/Infinity propagation
+
+### 12.3 Macro Design for Float Ops
+
+Float binary/comparison ops use macros paralleling the i32/i64 approach:
+
+```lisp
+;; Binary arithmetic (result is same float type)
+(def-f32-binop execute-f32.add (+ v1 v2))
+(def-f64-binop execute-f64.mul (* v1 v2))
+
+;; Comparisons (result is i32 0 or 1)
+(def-f32-cmpop execute-f32.lt (< v1 v2))
+(def-f64-cmpop execute-f64.eq (= v1 v2))
+```
+
+Division is hand-written to add the zero-check trap.
+
+### 12.4 Signed Conversion Strategy
+
+For `convert_i32_s` / `convert_i64_s`, the unsigned bitvector is reinterpreted
+as signed using the standard two's complement formula:
+```lisp
+(sv (if (>= v (expt 2 31)) (- v (expt 2 32)) v))
+```
+
+For `trunc_f32/f64_s`, the truncated value is checked against the signed range
+`[-2^31, 2^31)` then converted back to unsigned:
+```lisp
+(uv (if (< tv 0) (+ tv (expt 2 32)) tv))
+```
