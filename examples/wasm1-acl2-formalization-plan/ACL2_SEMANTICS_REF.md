@@ -894,7 +894,7 @@ and cannot be `enable`d — only the accessors (`label-entry->arity`, etc.) are 
 2. `defund` recursive functions (`top-n-operands`, `push-vals`) need `:expand` hints
 3. For control flow proofs, split on the branch condition to avoid exponential case analysis
 
-### Proof File Inventory (53 Q.E.D.s total, 16 files)
+### Proof File Inventory (58 Q.E.D.s total, 17 files)
 
 | File | Theorems | Technique |
 |------|----------|-----------|
@@ -914,6 +914,7 @@ and cannot be `enable`d — only the accessors (`label-entry->arity`, etc.) are 
 | proof-i64-conv-spec.lisp (5) | i64-add/sub/mul-spec, i32-wrap-i64-spec, i64-extend-i32-u-spec | :expand + acl2:: prefixed BV ops |
 | proof-trap-misc-spec.lisp (4) | i64-extend-i32-s-positive, i32-div-by-zero-traps, unreachable-traps, nop-advances-only | Trap condition proofs |
 | proof-abs-e2e.lisp (5) | abs-of-zero, abs-of-positive, abs-of-negative, return-exits-block-early, return-skips-unreachable-code | **End-to-end program** + return/dead-code |
+| proof-validation-soundness.lisp (5) | tc-i32-add-correct, tc-rejects-add-type-mismatch, tc-rejects-local-get-oob, tc-rejects-immutable-global-set, tc-abs-body-valid | **Type checker correctness** |
 
 ### Multi-Iteration Loop Proof Technique (proof-loop-spec.lisp)
 
@@ -949,6 +950,50 @@ where M is the number of post-loop instructions.
 
 **Limitation**: Does not scale to large N or symbolic N. For that, a custom
 induction scheme would be needed (future work).
+
+### Type Checker Architecture (validation.lisp, M9)
+
+**Design**: The type checker implements SpecTec 6-typing.spectec as a recursive
+ACL2 function that walks instruction sequences, threading a "type stack."
+
+```lisp
+;; Core API:
+(type-check-instr ctx instr stack) -> new-stack | :invalid
+(type-check-instrs ctx instrs stack) -> final-stack | :invalid
+(validate-func-body ctx params results locals body) -> t | nil
+```
+
+**Type stack**: A list of value type keywords `(:i32 :i64 :f32 :f64)`.
+The special value `(:polymorphic)` marks unreachable code (after `br`, `return`,
+`unreachable`), which matches any expected type.
+
+**Mutual recursion**: `type-check-instr` and `type-check-instrs` form a
+`mutual-recursion` pair because block/loop/if instructions contain nested
+instruction sequences that must be recursively type-checked.
+
+**Stack operations**:
+- `stack-pop-check`: verify top of stack matches expected types (handles polymorphic)
+- `stack-push`: push result types onto stack
+- `stack-transition`: consume-then-produce pattern (e.g., `(:i32 :i32) -> (:i32)` for binops)
+
+**Context**: An alist with keys `:types`, `:funcs`, `:locals`, `:labels`, `:return`,
+`:globals`, `:mems`, `:tables`. Labels are a stack (innermost first) pushed when
+entering block/loop/if. Loop labels have eps type (per WASM spec: br to loop head
+doesn't pass values).
+
+**Key WASM 1.0 typing rules implemented**:
+- Constants: eps -> t (where t matches the instruction's type)
+- Binary ops: t t -> t
+- Test ops: t -> i32
+- Relational ops: t t -> i32
+- Conversion ops: src_type -> dst_type (24 conversions)
+- local.get/set/tee: index must be in range, type must match
+- global.set: must be mutable (:var, not :const)
+- block/loop/if: push label, type-check body, verify result matches arity
+- br: label index must be valid, go polymorphic (unreachable after br)
+- br_if: pop i32 condition, check label type, keep stack for fall-through
+- return: check return type from context, go polymorphic
+- Load/store: require memory (ctx-mems > 0), correct value type
 
 ---
 
