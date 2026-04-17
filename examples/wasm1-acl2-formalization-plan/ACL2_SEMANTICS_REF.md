@@ -894,20 +894,60 @@ and cannot be `enable`d — only the accessors (`label-entry->arity`, etc.) are 
 2. `defund` recursive functions (`top-n-operands`, `push-vals`) need `:expand` hints
 3. For control flow proofs, split on the branch condition to avoid exponential case analysis
 
-### Proof File Inventory (32 Q.E.D.s total)
+### Proof File Inventory (48 Q.E.D.s total, 16 files)
 
 | File | Theorems | Technique |
 |------|----------|-----------|
-| proof-add-spec.lisp | i32-add-spec, i32-add-commutative | :expand + full theory |
-| proof-sub-spec.lisp | i32-sub-spec, i32-sub-self-zero, i32-add-sub-inverse | :expand + full theory |
-| proof-mem-roundtrip.lisp | le-bytes-roundtrip, nth-update-nth-same/diff, mem-read-write-4, u32-to-le-bytes-is-list4, i32-store-load-semantic-roundtrip | encapsulate + layered :use |
-| proof-bitwise.lisp | i32-xor-self-zero, i32-and-idempotent, i32-or-zero-identity | :expand + BV library |
-| proof-mul-eqz-spec.lisp | i32-mul-spec, i32-mul-by-zero, i32-eqz-of-zero, i32-eqz-of-nonzero | :expand + full theory |
-| proof-select-spec.lisp | select-nonzero-returns-first, select-zero-returns-second | :expand + full theory, uses `defconst *wasm-exec-theory*` |
-| proof-call-indirect-spec.lisp | call_indirect-delegates-to-call, call_indirect-oob-traps, call_indirect-nil-entry-traps | Function-level (delegates) + run-level (traps) |
-| proof-max-if-else.lisp | max-when-a-greater, max-when-b-geq, max-if-else-correct | **Case-split + :use combine**, omit instrp |
-| proof-float-spec.lisp | f64-add-spec, f64-mul-spec, f32-add-spec | :expand + float theory |
-| proof-local-drop-spec.lisp | local-set-get-roundtrip, local-tee-preserves-value, drop-removes-top | :expand + local theory |
+| proof-add-spec.lisp (2) | i32-add-spec, i32-add-commutative | :expand + full theory |
+| proof-sub-spec.lisp (3) | i32-sub-spec, i32-sub-self-zero, i32-add-sub-inverse | :expand + full theory |
+| proof-mem-roundtrip.lisp (6) | le-bytes-roundtrip, nth-update-nth-same/diff, mem-read-write-4, u32-to-le-bytes-is-list4, i32-store-load-semantic-roundtrip | encapsulate + layered :use |
+| proof-bitwise.lisp (3) | i32-xor-self-zero, i32-and-idempotent, i32-or-zero-identity | :expand + BV library |
+| proof-mul-eqz-spec.lisp (4) | i32-mul-spec, i32-mul-by-zero, i32-eqz-of-zero, i32-eqz-of-nonzero | :expand + full theory |
+| proof-select-spec.lisp (2) | select-nonzero-returns-first, select-zero-returns-second | :expand + `defconst *wasm-exec-theory*` |
+| proof-call-indirect-spec.lisp (3) | call_indirect-delegates-to-call, -oob-traps, -nil-entry-traps | Function-level + run-level |
+| proof-max-if-else.lisp (3) | max-when-a-greater, max-when-b-geq, max-if-else-correct | **Case-split + :use combine**, omit instrp |
+| proof-float-spec.lisp (3) | f64-add-spec, f64-mul-spec, f32-add-spec | :expand + float theory |
+| proof-local-drop-spec.lisp (3) | local-set-get-roundtrip, local-tee-preserves-value, drop-removes-top | :expand + local theory |
+| proof-global-spec.lisp (2) | global-set-get-roundtrip, global-set-const-traps | :expand + global theory |
+| proof-block-br-spec.lisp (2) | block-passes-result, br-exits-block | :expand + label stack ops |
+| proof-loop-spec.lisp (3) | loop-exits-on-false-condition, countdown-loop-2-reaches-zero, **sum-loop-3-equals-6** | :expand + loop re-entry unrolling |
+| proof-i64-conv-spec.lisp (5) | i64-add/sub/mul-spec, i32-wrap-i64-spec, i64-extend-i32-u-spec | :expand + acl2:: prefixed BV ops |
+| proof-trap-misc-spec.lisp (4) | i64-extend-i32-s-positive, i32-div-by-zero-traps, unreachable-traps, nop-advances-only | Trap condition proofs |
+
+### Multi-Iteration Loop Proof Technique (proof-loop-spec.lisp)
+
+**Challenge**: Proving that a loop correctly executes N iterations.
+
+**Solution**: Concrete unrolling via `:expand` hints. ACL2's prover symbolically
+evaluates each step:
+
+```lisp
+;; Theory must include loop re-entry mechanism:
+(defconst *loop-full-theory*
+  '(run execute-instr execute-i32.const execute-i32.add execute-i32.sub
+    execute-loop execute-local.get execute-local.set execute-local.tee
+    ... nth-label pop-n-labels nth-local update-nth-local))
+
+;; 3-iteration sum(1..3)=6: unrolls 32 steps
+(defthm sum-loop-3-equals-6
+  (equal (top-operand (current-operand-stack (run 32 *state*)))
+         (make-i32-val 6))
+  :hints (("Goal" :in-theory (enable . #.*loop-full-theory*)
+                  :expand ((:free (n s) (run n s))
+                           (:free (n s a) (top-n-operands n s a))
+                           (:free (n s) (pop-n-labels n s))
+                           (:free (v s) (push-vals v s))))))
+```
+
+**Key insight**: For a loop with K instructions per iteration and N iterations,
+need `run (1 + K*N + 2 + extra)` steps. The `:expand` hint lets ACL2 unfold
+each step symbolically. Works well for small N (tested up to N=3, 32 steps).
+
+**Step counting formula**: `loop-enter(1) + body(K) × N + label-complete(1) + post-loop(M)`
+where M is the number of post-loop instructions.
+
+**Limitation**: Does not scale to large N or symbolic N. For that, a custom
+induction scheme would be needed (future work).
 
 ---
 

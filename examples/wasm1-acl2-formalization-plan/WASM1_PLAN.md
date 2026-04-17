@@ -27,14 +27,14 @@
 | M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability enforcement |
 | M7a: Floats | ✅ | 56 | 28 | f32/f64 arith, compare, unary, conversions, promote/demote |
 | M7b: Tables | ✅ | 1 | 6 | call_indirect, table lookup, OOB/nil traps |
-| M8: Proofs | ✅ | 32 thms | — | add/sub/mul/eqz, bitwise, mem, select, call_indirect, **max if/else**, **floats**, **local/drop** |
+| M8: Proofs | ✅ | **48 thms** | — | i32/i64 arith, bitwise, mem, select, call_indirect, if/else, floats, **loops**, globals, traps |
 | M9: Validation | todo | | | Type checking, module validation |
-| **Total done** | | **159 instrs** | **79 ACL2 tests** | + **32 machine-checked theorems** |
+| **Total done** | | **159 instrs** | **79 ACL2 tests** | + **48 machine-checked theorems** |
 
-**execution.lisp**: 2856 lines, proofs/ directory with 32 Q.E.D. theorems (10 proof files), certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**execution.lisp**: 2856 lines, proofs/ directory with **48 Q.E.D. theorems** (16 proof files), certifies cleanly with ACL2 8.7 + SBCL 2.5.2
 **Oracle pipeline**: 62 checks (9 WAT files × Node.js), all pass
 **ACL2 tests**: 79 (20 spot-check + 10 packed-mem + 15 packed-i64 + 6 tables + 28 floats)
-**Proofs**: 32 Q.E.D. theorems across 10 files (add-spec, sub-spec, mul-eqz, bitwise, memory-roundtrip, select-spec, call-indirect-spec, **max-if-else**, **float-spec**, **local-drop-spec**)
+**Proofs**: 48 Q.E.D. theorems across 16 files covering: i32/i64 arithmetic, bitwise, memory roundtrip, select, call_indirect, **control flow (if/else + block/br)**, **multi-iteration loops**, floats, local variables, globals, type conversions, trap conditions, and nop identity
 
 ---
 
@@ -454,7 +454,7 @@ computes correctly under exact arithmetic also computes correctly under IEEE 754
 
 ---
 
-## Milestone 8: Proofs & Verification (Sprint 8) — 32 Theorems Proven ✅
+## Milestone 8: Proofs & Verification (Sprint 8) — 48 Theorems Proven ✅
 
 **Goal**: Prove correctness theorems for representative WASM programs.
 
@@ -521,13 +521,49 @@ for `top-n-operands` and `push-vals` (defund recursive). Omit `instrp` from theo
 - [x] **`local-tee-preserves-value`** (Q.E.D.): `(i32.const v) (local.tee 0)` → v on stack
 - [x] **`drop-removes-top`** (Q.E.D.): `(i32.const a) (i32.const b) (drop)` → a
 
-### 8.11 Future Proofs (stretch goals)
-- [ ] **factorial-proof** — loop-based factorial computes n! (inductive, requires loop invariant)
-- [ ] **memory-copy-proof** — copying N bytes produces identical sequences
-- [ ] Induction schemes for loop proofs
+### 8.11 Global Variable Proofs ✅ (2 Q.E.D.s — proof-global-spec.lisp)
+- [x] **`global-set-get-roundtrip`** (Q.E.D.): mutable global set→get returns stored value
+- [x] **`global-set-const-traps`** (Q.E.D.): setting immutable (`:const`) global → `:trap`
 
-**Exit criteria**: ✅ 32 proofs certified (far exceeds target of 3). Arithmetic, bitwise, memory,
-select, call_indirect, mul/eqz, **control flow (if/else)**, **floats**, and **local variable** properties proven.
+### 8.12 Block & Branch Proofs ✅ (2 Q.E.D.s — proof-block-br-spec.lisp)
+- [x] **`block-passes-result`** (Q.E.D.): block label lifecycle (push on entry, pop on completion)
+- [x] **`br-exits-block`** (Q.E.D.): `br 0` exits enclosing block, keeping arity values
+
+First proofs involving **label stack lifecycle** (push on block entry, pop on br/completion).
+
+### 8.13 Loop Proofs ✅ (3 Q.E.D.s — proof-loop-spec.lisp)
+- [x] **`loop-exits-on-false-condition`** (Q.E.D.): loop/br_if exit mechanism (symbolic)
+- [x] **`countdown-loop-2-reaches-zero`** (Q.E.D.): 2-iteration countdown terminates at 0 (14 steps)
+- [x] **`sum-loop-3-equals-6`** (Q.E.D.): 3-iteration accumulator computes sum(1..3)=6 (32 steps)
+
+**Proof technique**: Multi-iteration loops proven by concrete unrolling. ACL2's `:expand` hint
+unrolls `run 32` step-by-step through all 3 loop iterations. Requires `pop-n-labels` expand hint
+and full loop theory including `execute-loop`, `execute-local.tee`, `update-nth-local`.
+
+### 8.14 i64 Arithmetic & Conversion Proofs ✅ (5 Q.E.D.s — proof-i64-conv-spec.lisp)
+- [x] **`i64-add-spec`** (Q.E.D.): `bvplus 64`
+- [x] **`i64-sub-spec`** (Q.E.D.): `acl2::bvminus 64`
+- [x] **`i64-mul-spec`** (Q.E.D.): `acl2::bvmult 64`
+- [x] **`i32-wrap-i64-spec`** (Q.E.D.): truncation to low 32 bits (`acl2::bvchop 32`)
+- [x] **`i64-extend-i32-u-spec`** (Q.E.D.): zero-extension preserves unsigned value
+
+**Note**: `bvminus`, `bvmult`, `bvchop` not imported into WASM package — need `acl2::` prefix.
+
+### 8.15 Trap & Miscellaneous Proofs ✅ (4 Q.E.D.s — proof-trap-misc-spec.lisp)
+- [x] **`i64-extend-i32-s-positive`** (Q.E.D.): sign-extension preserves positive i32 values
+- [x] **`i32-div-by-zero-traps`** (Q.E.D.): division by zero → `:trap` (for all u32 a)
+- [x] **`unreachable-traps`** (Q.E.D.): `unreachable` instruction always produces `:trap`
+- [x] **`nop-advances-only`** (Q.E.D.): `nop` is identity (advances instruction pointer only)
+
+### 8.16 Future Proofs (stretch goals)
+- [ ] **factorial-inductive** — factorial(n) = n! (requires custom induction scheme)
+- [ ] **memory-copy-proof** — copying N bytes produces identical sequences
+- [ ] General loop induction schemes (abstract loop invariant framework)
+
+**Exit criteria**: ✅ 48 proofs certified (far exceeds target of 3). Comprehensive coverage across
+all major WASM feature categories: arithmetic (i32/i64/f32/f64), bitwise, memory, control flow
+(block/br/loop/if-else), functions (call_indirect), local/global variables, type conversions,
+trap conditions, and parametric instructions.
 
 **Estimated time for stretch proofs**: 4-8 hours.
 
