@@ -27,14 +27,14 @@
 | M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability enforcement |
 | M7a: Floats | ✅ | 56 | 28 | f32/f64 arith, compare, unary, conversions, promote/demote |
 | M7b: Tables | ✅ | 1 | 6 | call_indirect, table lookup, OOB/nil traps |
-| M8: Proofs | ✅ | **48 thms** | — | i32/i64 arith, bitwise, mem, select, call_indirect, if/else, floats, **loops**, globals, traps |
+| M8: Proofs | ✅ | **53 thms** | — | i32/i64 arith, bitwise, mem, select, call_indirect, if/else, **loops**, globals, traps, **abs() e2e**, **return** |
 | M9: Validation | todo | | | Type checking, module validation |
-| **Total done** | | **159 instrs** | **79 ACL2 tests** | + **48 machine-checked theorems** |
+| **Total done** | | **159 instrs** | **79 ACL2 tests** | + **53 machine-checked theorems** |
 
-**execution.lisp**: 2856 lines, proofs/ directory with **48 Q.E.D. theorems** (16 proof files), certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**execution.lisp**: 2856 lines, proofs/ directory with **53 Q.E.D. theorems** (16 proof files), certifies cleanly with ACL2 8.7 + SBCL 2.5.2
 **Oracle pipeline**: 62 checks (9 WAT files × Node.js), all pass
 **ACL2 tests**: 79 (20 spot-check + 10 packed-mem + 15 packed-i64 + 6 tables + 28 floats)
-**Proofs**: 48 Q.E.D. theorems across 16 files covering: i32/i64 arithmetic, bitwise, memory roundtrip, select, call_indirect, **control flow (if/else + block/br)**, **multi-iteration loops**, floats, local variables, globals, type conversions, trap conditions, and nop identity
+**Proofs**: 53 Q.E.D. theorems across 16 files covering: i32/i64 arithmetic, bitwise, memory roundtrip, select, call_indirect, **control flow (block/br/loop/if-else/return)**, **multi-iteration loops (sum 1..3=6)**, floats, local/global variables, type conversions, trap conditions (div-by-zero, unreachable, immutable global), **end-to-end abs() program**, and return/dead-code elimination
 
 ---
 
@@ -454,7 +454,7 @@ computes correctly under exact arithmetic also computes correctly under IEEE 754
 
 ---
 
-## Milestone 8: Proofs & Verification (Sprint 8) — 48 Theorems Proven ✅
+## Milestone 8: Proofs & Verification (Sprint 8) — 53 Theorems Proven ✅
 
 **Goal**: Prove correctness theorems for representative WASM programs.
 
@@ -555,15 +555,29 @@ and full loop theory including `execute-loop`, `execute-local.tee`, `update-nth-
 - [x] **`unreachable-traps`** (Q.E.D.): `unreachable` instruction always produces `:trap`
 - [x] **`nop-advances-only`** (Q.E.D.): `nop` is identity (advances instruction pointer only)
 
-### 8.16 Future Proofs (stretch goals)
+### 8.16 End-to-End Program Proofs ✅ (5 Q.E.D.s — proof-abs-e2e.lisp)
+
+**Part A: abs(x) function** — proves a complete WASM function combining local.get, i32.lt_s,
+if/else, and i32.sub:
+- [x] **`abs-of-zero`** (Q.E.D.): abs(0) = 0 (else branch)
+- [x] **`abs-of-positive`** (Q.E.D.): abs(7) = 7 (else branch)
+- [x] **`abs-of-negative`** (Q.E.D.): abs(-5) = 5 (then branch, 2's complement)
+
+**Part B: return instruction** — proves early function exit and dead code elimination:
+- [x] **`return-exits-block-early`** (Q.E.D.): return inside block produces `:done` (consp result)
+- [x] **`return-skips-unreachable-code`** (Q.E.D.): car is `:done`, not the state after executing i32.const 99
+
+### 8.17 Future Proofs (stretch goals)
 - [ ] **factorial-inductive** — factorial(n) = n! (requires custom induction scheme)
 - [ ] **memory-copy-proof** — copying N bytes produces identical sequences
 - [ ] General loop induction schemes (abstract loop invariant framework)
+- [ ] br_table dispatch proof (indexed branch selection)
+- [ ] Nested loop proof (inner/outer loop interaction)
 
-**Exit criteria**: ✅ 48 proofs certified (far exceeds target of 3). Comprehensive coverage across
+**Exit criteria**: ✅ **53 proofs certified** (far exceeds target of 3). Comprehensive coverage across
 all major WASM feature categories: arithmetic (i32/i64/f32/f64), bitwise, memory, control flow
-(block/br/loop/if-else), functions (call_indirect), local/global variables, type conversions,
-trap conditions, and parametric instructions.
+(block/br/loop/if-else/return), functions (call_indirect), local/global variables, type conversions,
+trap conditions, parametric instructions, **end-to-end program correctness**, and **dead code elimination**.
 
 **Estimated time for stretch proofs**: 4-8 hours.
 

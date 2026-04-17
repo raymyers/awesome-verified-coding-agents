@@ -894,7 +894,7 @@ and cannot be `enable`d — only the accessors (`label-entry->arity`, etc.) are 
 2. `defund` recursive functions (`top-n-operands`, `push-vals`) need `:expand` hints
 3. For control flow proofs, split on the branch condition to avoid exponential case analysis
 
-### Proof File Inventory (48 Q.E.D.s total, 16 files)
+### Proof File Inventory (53 Q.E.D.s total, 16 files)
 
 | File | Theorems | Technique |
 |------|----------|-----------|
@@ -913,6 +913,7 @@ and cannot be `enable`d — only the accessors (`label-entry->arity`, etc.) are 
 | proof-loop-spec.lisp (3) | loop-exits-on-false-condition, countdown-loop-2-reaches-zero, **sum-loop-3-equals-6** | :expand + loop re-entry unrolling |
 | proof-i64-conv-spec.lisp (5) | i64-add/sub/mul-spec, i32-wrap-i64-spec, i64-extend-i32-u-spec | :expand + acl2:: prefixed BV ops |
 | proof-trap-misc-spec.lisp (4) | i64-extend-i32-s-positive, i32-div-by-zero-traps, unreachable-traps, nop-advances-only | Trap condition proofs |
+| proof-abs-e2e.lisp (5) | abs-of-zero, abs-of-positive, abs-of-negative, return-exits-block-early, return-skips-unreachable-code | **End-to-end program** + return/dead-code |
 
 ### Multi-Iteration Loop Proof Technique (proof-loop-spec.lisp)
 
