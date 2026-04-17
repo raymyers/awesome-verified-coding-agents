@@ -119,6 +119,31 @@ try {
   console.log('  PASS: dispatch(5,99) → trap');
 }
 
+// --- float_ops (M7a, M8.8, M8.9) ---
+const fo = await load('float_ops');
+[
+  ['f64_add(1.5,2.5)', fo.f64_add(1.5, 2.5), 4],
+  ['f64_sub(10,3)', fo.f64_sub(10, 3), 7],
+  ['f64_mul(7,6)', fo.f64_mul(7, 6), 42],
+  ['f64_div(22,7)', fo.f64_div(22, 7), 22/7],
+  ['f64_neg(42)', fo.f64_neg(42), -42],
+  ['f64_abs(-100)', fo.f64_abs(-100), 100],
+  ['f64_ceil(1.5)', fo.f64_ceil(1.5), 2],
+  ['f64_floor(3.5)', fo.f64_floor(3.5), 3],
+  ['f64_eq(3,3)', fo.f64_eq(3, 3), 1],
+  ['f64_eq(3,4)', fo.f64_eq(3, 4), 0],
+  ['f64_lt(2,5)', fo.f64_lt(2, 5), 1],
+  ['f32_add(1.5,2.5)', fo.f32_add(1.5, 2.5), 4],
+  ['f32_mul(3,4)', fo.f32_mul(3, 4), 12],
+  ['i32_max(10,3)', fo.i32_max(10, 3), 10],
+  ['i32_max(3,10)', fo.i32_max(3, 10), 10],
+  ['i32_max(5,5)', fo.i32_max(5, 5), 5],
+  ['f64_convert_i32_s(-1)', fo.f64_convert_i32_s(-1), -1],
+  ['i32_trunc_f64_u(3.7)', fo.i32_trunc_f64_u(3.7), 3],
+].forEach(([label, actual, expected]) => {
+  if (!check(label, actual, expected)) failures++;
+});
+
 console.log('');
 if (failures === 0) {
   console.log('=== ALL ORACLE CHECKS PASSED ===');

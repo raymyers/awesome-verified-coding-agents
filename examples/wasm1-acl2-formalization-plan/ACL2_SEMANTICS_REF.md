@@ -859,7 +859,42 @@ To prove these at the WASM instruction level:
 
 No special hints needed — the standard WASM execution theory + BV library suffice.
 
-### Proof File Inventory (23 Q.E.D.s total)
+### Control Flow Proof Technique (proof-max-if-else.lisp)
+
+**Challenge**: Proving `max(a,b)` via if/else involves:
+- `execute-if` dispatching to then/else branch
+- Label stack push/pop via `complete-label`
+- Case split on `a > b` vs `a <= b`
+
+**Problem discovered**: Enabling `instrp` (150+ instruction recognizer cases) in the
+theory causes rewrite explosion. Also, `make-label-entry` is a **macro** (from `defaggregate`)
+and cannot be `enable`d — only the accessors (`label-entry->arity`, etc.) are functions.
+
+**Solution — case-splitting + omission**:
+```lisp
+;; 1. Omit instrp from theory (150+ cases not needed with :verify-guards nil)
+;; 2. Add :expand hints for recursive defund functions
+;; 3. Split into two explicit cases, then combine via :use
+
+(defthm max-when-a-greater  ;; Case 1: a > b
+  ...
+  :hints (("Goal" :in-theory (enable . #.*max-theory*)
+                  :expand ((:free (n s) (run n s))
+                           (:free (n s a) (top-n-operands n s a))
+                           (:free (v s) (push-vals v s))))))
+
+(defthm max-if-else-correct  ;; Combined
+  ...
+  :hints (("Goal" :use ((:instance max-when-a-greater)
+                         (:instance max-when-b-geq)))))
+```
+
+**Key learnings**:
+1. `defaggregate` creates macros for `make-X` and functions for `X->field` — only enable accessors
+2. `defund` recursive functions (`top-n-operands`, `push-vals`) need `:expand` hints
+3. For control flow proofs, split on the branch condition to avoid exponential case analysis
+
+### Proof File Inventory (32 Q.E.D.s total)
 
 | File | Theorems | Technique |
 |------|----------|-----------|
@@ -870,6 +905,9 @@ No special hints needed — the standard WASM execution theory + BV library suff
 | proof-mul-eqz-spec.lisp | i32-mul-spec, i32-mul-by-zero, i32-eqz-of-zero, i32-eqz-of-nonzero | :expand + full theory |
 | proof-select-spec.lisp | select-nonzero-returns-first, select-zero-returns-second | :expand + full theory, uses `defconst *wasm-exec-theory*` |
 | proof-call-indirect-spec.lisp | call_indirect-delegates-to-call, call_indirect-oob-traps, call_indirect-nil-entry-traps | Function-level (delegates) + run-level (traps) |
+| proof-max-if-else.lisp | max-when-a-greater, max-when-b-geq, max-if-else-correct | **Case-split + :use combine**, omit instrp |
+| proof-float-spec.lisp | f64-add-spec, f64-mul-spec, f32-add-spec | :expand + float theory |
+| proof-local-drop-spec.lisp | local-set-get-roundtrip, local-tee-preserves-value, drop-removes-top | :expand + local theory |
 
 ---
 

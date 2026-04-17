@@ -13,7 +13,7 @@
 > **Existing skeleton**: [Kestrel WASM books](https://github.com/acl2/acl2/tree/master/books/kestrel/wasm)
 > (execution.lisp, parse-binary.lisp, add-proof.lisp)
 
-### Current Status (M0–M6, M4b, M7b, M8 COMPLETE)
+### Current Status (M0–M8 COMPLETE)
 
 | Milestone | Status | Instructions | Tests | Key Capability |
 |-----------|--------|-------------|-------|----------------|
@@ -25,16 +25,16 @@
 | M4b: Packed Mem | ✅ | 15 | 10 | load8/16_u/s, store8/16, i64 variants |
 | M5: i64 + Conversions | ✅ | 37 | 24 | i64 arithmetic/bitwise/compare, conversions, i64 memory |
 | M6: Globals | ✅ | 2 | 7 | global.get, global.set, mutability enforcement |
-| M8: Proofs | ✅ | 23 thms | — | add/sub/mul/eqz spec, bitwise, mem roundtrip, select, call_indirect |
-| M7b: Tables | ✅ | 1 | 6 | call_indirect, table lookup, OOB/nil traps |
 | M7a: Floats | ✅ | 56 | 28 | f32/f64 arith, compare, unary, conversions, promote/demote |
+| M7b: Tables | ✅ | 1 | 6 | call_indirect, table lookup, OOB/nil traps |
+| M8: Proofs | ✅ | 32 thms | — | add/sub/mul/eqz, bitwise, mem, select, call_indirect, **max if/else**, **floats**, **local/drop** |
 | M9: Validation | todo | | | Type checking, module validation |
-| **Total done** | | **159 instrs** | **79 ACL2 tests** | + 23 machine-checked theorems |
+| **Total done** | | **159 instrs** | **79 ACL2 tests** | + **32 machine-checked theorems** |
 
-**execution.lisp**: 2856 lines, proofs/ directory with 23 Q.E.D. theorems (7 proof files), certifies cleanly with ACL2 8.7 + SBCL 2.5.2
-**Oracle pipeline**: 44 checks (8 WAT files × Node.js), all pass
+**execution.lisp**: 2856 lines, proofs/ directory with 32 Q.E.D. theorems (10 proof files), certifies cleanly with ACL2 8.7 + SBCL 2.5.2
+**Oracle pipeline**: 62 checks (9 WAT files × Node.js), all pass
 **ACL2 tests**: 79 (20 spot-check + 10 packed-mem + 15 packed-i64 + 6 tables + 28 floats)
-**Proofs**: 23 Q.E.D. theorems across 7 files (add-spec, sub-spec, mul-eqz, bitwise, memory-roundtrip, select-spec, call-indirect-spec)
+**Proofs**: 32 Q.E.D. theorems across 10 files (add-spec, sub-spec, mul-eqz, bitwise, memory-roundtrip, select-spec, call-indirect-spec, **max-if-else**, **float-spec**, **local-drop-spec**)
 
 ---
 
@@ -454,7 +454,7 @@ computes correctly under exact arithmetic also computes correctly under IEEE 754
 
 ---
 
-## Milestone 8: Proofs & Verification (Sprint 8) — 23 Theorems Proven ✅
+## Milestone 8: Proofs & Verification (Sprint 8) — 32 Theorems Proven ✅
 
 **Goal**: Prove correctness theorems for representative WASM programs.
 
@@ -502,16 +502,34 @@ computes correctly under exact arithmetic also computes correctly under IEEE 754
 - [x] **`call_indirect-oob-traps`** (Q.E.D.): Out-of-bounds table index → `:trap`.
 - [x] **`call_indirect-nil-entry-traps`** (Q.E.D.): Uninitialized (nil) table entry → `:trap`.
 
-### 8.8 Future Proofs (todo)
-- [ ] **max-proof** — max(a,b) using if/else is correct (requires control flow reasoning)
+### 8.8 Control Flow Proofs ✅ (3 Q.E.D.s — proof-max-if-else.lisp)
+- [x] **`max-when-a-greater`** (Q.E.D.): if `a > b`, program returns `a`
+- [x] **`max-when-b-geq`** (Q.E.D.): if `a <= b`, program returns `b`
+- [x] **`max-if-else-correct`** (Q.E.D.): Combined — max(a,b) via if/else is correct for all u32
+
+**Proof technique**: Split into two cases to avoid case-split explosion. Use `:expand` hints
+for `top-n-operands` and `push-vals` (defund recursive). Omit `instrp` from theory
+(150+ instruction cases cause rewrite blowup). Combine cases via `:use`.
+
+### 8.9 Float Specification Proofs ✅ (3 Q.E.D.s — proof-float-spec.lisp)
+- [x] **`f64-add-spec`** (Q.E.D.): `(f64.const a) (f64.const b) (f64.add)` → `(f64 a+b)`
+- [x] **`f64-mul-spec`** (Q.E.D.): `(f64.const a) (f64.const b) (f64.mul)` → `(f64 a*b)`
+- [x] **`f32-add-spec`** (Q.E.D.): `(f32.const a) (f32.const b) (f32.add)` → `(f32 a+b)`
+
+### 8.10 Local Variable & Drop Proofs ✅ (3 Q.E.D.s — proof-local-drop-spec.lisp)
+- [x] **`local-set-get-roundtrip`** (Q.E.D.): `(i32.const v) (local.set 0) (local.get 0)` → v
+- [x] **`local-tee-preserves-value`** (Q.E.D.): `(i32.const v) (local.tee 0)` → v on stack
+- [x] **`drop-removes-top`** (Q.E.D.): `(i32.const a) (i32.const b) (drop)` → a
+
+### 8.11 Future Proofs (stretch goals)
 - [ ] **factorial-proof** — loop-based factorial computes n! (inductive, requires loop invariant)
 - [ ] **memory-copy-proof** — copying N bytes produces identical sequences
-- [ ] **f64-add-spec** — float addition specification
 - [ ] Induction schemes for loop proofs
 
-**Exit criteria**: ✅ 23 proofs certified (far exceeds target of 3). Arithmetic, bitwise, memory, select, call_indirect, and mul/eqz properties proven.
+**Exit criteria**: ✅ 32 proofs certified (far exceeds target of 3). Arithmetic, bitwise, memory,
+select, call_indirect, mul/eqz, **control flow (if/else)**, **floats**, and **local variable** properties proven.
 
-**Estimated time for remaining proofs**: 4-8 hours.
+**Estimated time for stretch proofs**: 4-8 hours.
 
 ---
 
