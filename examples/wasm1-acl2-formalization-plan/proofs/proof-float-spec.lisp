@@ -17,7 +17,7 @@
     current-label-stack current-locals
     update-current-operand-stack update-current-instrs
     complete-label return-from-function
-    make-f64-val make-f32-val f64-valp f32-valp
+    make-f64-val make-f32-val
     f64-const-argsp f32-const-argsp
     make-i32-val i32-valp i32-const-argsp no-argsp
     push-operand top-operand pop-operand top-n-operands push-vals

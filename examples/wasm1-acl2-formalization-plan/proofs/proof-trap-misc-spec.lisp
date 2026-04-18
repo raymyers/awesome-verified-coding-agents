@@ -22,7 +22,7 @@
     push-operand top-operand pop-operand
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp f32-valp f64-valp u32p u64p))
+    valp u32p u64p))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: Sign extension preserves positive values

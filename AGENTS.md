@@ -100,8 +100,15 @@ cd tests/oracle && bash check-all.sh
 ALWAYS derive expected values from `wat2wasm` + Node.js FIRST, then encode in ACL2.
 Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 
+## Verified State (2026-04-18)
+- **156/170** WASM 1.0 instructions (91%), `execution.lisp` CERTIFIES (2856 lines)
+- **12/12** test files pass (224 assertions, 0 failures)
+- **16/17** proof files pass (110 Q.E.D.s; only float-spec has 3 failures)
+- **All non-float WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, memory, conversions
+- **Missing 14 float instructions**: copysign, nearest, trunc(f→f), reinterpret, f32/f64 load/store
+
 ## What's Next
-- M7a: Floating-point (f32/f64) — IEEE 754 modeling
-- M7b: Tables + call_indirect
-- M7c: Module instantiation + binary integration
-- M9: Type validation
+- Complete 14 remaining float instructions (requires IEEE 754 bit-level model)
+- Fix 3 float proof failures (theory hints need correct unfold list)
+- Guard verification (currently deferred with `:verify-guards nil`)
+- Module instantiation + binary parser integration

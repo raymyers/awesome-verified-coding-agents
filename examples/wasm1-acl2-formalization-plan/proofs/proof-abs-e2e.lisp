@@ -51,7 +51,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp i64-valp f32-valp f64-valp u32p u64p val-listp
+    valp i64-valp u32p u64p val-listp
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
     label-stackp nth-label pop-n-labels
@@ -127,7 +127,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp i64-valp f32-valp f64-valp u32p u64p val-listp
+    valp i64-valp u32p u64p val-listp
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
     label-stackp nth-label pop-n-labels))

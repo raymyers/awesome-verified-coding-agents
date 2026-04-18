@@ -6,7 +6,7 @@
 (in-package "ACL2")
 (ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(ld "/tmp/awesome-verified-coding-agents/examples/wasm1-acl2-formalization-plan/validation.lisp")
+(ld "/workspace/project/examples/wasm1-acl2-formalization-plan/validation.lisp")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helper: check that a sequence type-checks to expected stack result

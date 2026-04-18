@@ -25,7 +25,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp i64-valp f32-valp f64-valp u32p u64p
+    valp i64-valp u32p u64p
     nth-local update-nth-local))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -117,7 +117,7 @@
                                      push-operand top-operand pop-operand
                                      operand-stack-height empty-operand-stack operand-stackp
                                      localsp framep top-frame push-call-stack pop-call-stack call-stackp
-                                     valp i64-valp f32-valp f64-valp u32p u64p)
+                                     valp i64-valp u32p u64p)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
