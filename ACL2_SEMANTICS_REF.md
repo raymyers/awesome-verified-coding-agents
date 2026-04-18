@@ -2,71 +2,122 @@
 
 > Working notes and references for formalizing WASM 1.0 operational semantics
 > in ACL2, extending the Kestrel books (`books/kestrel/wasm/`).
+>
+> **Verified against**: ACL2 8.7 (commit HEAD) + SBCL 2.5.2 on Debian 13.
 
 ---
 
 ## 1. Build & Certification Environment
 
-### ACL2 Installation
+### ACL2 Installation (verified 2026-04-16)
 ```bash
 # Prerequisites
-sudo apt-get install -y sbcl   # Steel Bank Common Lisp
+sudo apt-get install -y sbcl   # Steel Bank Common Lisp (2.5.2)
 
-# Clone & build ACL2
-git clone --depth 1 https://github.com/acl2/acl2.git /opt/acl2
-cd /opt/acl2 && make LISP=sbcl
-export ACL2=/opt/acl2/saved_acl2
+# Clone & build ACL2 (~3 minutes)
+git clone --depth 1 https://github.com/acl2/acl2.git /tmp/acl2-full
+cd /tmp/acl2-full && make LISP=sbcl
+export ACL2=/tmp/acl2-full/saved_acl2
 
-# Certify a book (from the books/ directory)
-cd /opt/acl2/books
-ACL2=$ACL2 make USE_QUICKLISP=0 ACL2_CUSTOMIZATION=NONE kestrel/wasm/execution.cert
+# Verify
+echo '(+ 40 2) (quit)' | $ACL2   # Should print 42
 ```
 
-### Certification Order for Existing Books
-```
-portcullis.lisp         (package definition, via portcullis.acl2 → package.lsp)
-execution.lisp          (core interpreter: ~500 lines, depends on portcullis, bvplus, defaggregate)
-proof-support.lisp      (defopeners for run, nth-local, etc.)
-add-proof.lisp          (proof that add program computes bvplus 32 x y)
-parse-binary.lisp       (~1400 lines, binary format parser, partially complete)
-```
-
-### Headless Agent Certification Pattern
+### Certifying Books
 ```bash
-# Certify a single book
-cd /opt/acl2/books
-ACL2=/opt/acl2/saved_acl2 make USE_QUICKLISP=0 ACL2_CUSTOMIZATION=NONE \
-    kestrel/wasm/<bookname>.cert
+# ALWAYS use cert.pl (NOT make — no Makefile in kestrel/wasm/)
+cd /tmp/acl2-full
+books/build/cert.pl --acl2 ./saved_acl2 books/kestrel/wasm/execution
 
-# Run a test script interactively
-echo '
+# Certify our extended execution.lisp (needs package.lsp + portcullis in same dir)
+books/build/cert.pl --acl2 ./saved_acl2 /path/to/our/execution
+
+# Check certification log on failure
+cat /path/to/execution.cert.out
+```
+
+### Certification Order for Kestrel Books
+```
+package.lsp → portcullis.acl2 → portcullis.lisp (.cert)
+  → execution.lisp (.cert)   — 545 lines, i32-only skeleton
+  → proof-support.lisp (.cert) — defopeners for run, nth-local
+  → add-proof.lisp (.cert)    — symbolic add correctness
+  → parse-binary.lisp (.cert) — 1429 lines, WASM binary parser
+```
+
+### Running Tests (headless pattern — VERIFIED 2026-04-18)
+```bash
+# Run a .lisp test file — pipe to saved_acl2, check exit via assert-event
+cat test.lisp | $ACL2 2>&1 | grep -E "FAIL|PASSED|Error"
+
+# Run all tests
+PASS=0; FAIL=0
+for f in tests/*.lisp proofs/*.lisp; do
+  result=$(echo "(ld \"$f\") (quit)" | $ACL2 2>&1)
+  if echo "$result" | grep -q "FAILED\|ACL2 Error"; then
+    FAIL=$((FAIL+1)); echo "FAIL: $f"
+  else
+    PASS=$((PASS+1)); echo "OK: $f"
+  fi
+done; echo "=== $PASS passed, $FAIL failed ==="
+```
+
+### Test File Header Pattern (VERIFIED — this exact pattern works)
+```lisp
+;; For tests using Kestrel's execution only (i32.add, local.get):
 (in-package "ACL2")
-(ld "/opt/acl2/books/kestrel/wasm/package.lsp")
+(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
 (include-book "kestrel/wasm/execution" :dir :system)
-;; ... test code ...
-(quit)
-' | /opt/acl2/saved_acl2
+
+;; For tests using OUR extended execution (funcinst, globals, i64, etc.):
+(in-package "ACL2")
+(ld "/path/to/our/package.lsp")
+(in-package "WASM")
+(include-book "/path/to/our/execution")  ;; needs execution.cert
+
+;; CRITICAL: Always add this BEFORE any assert-event that calls our functions
+;; when guards are not fully verified:
+(set-guard-checking :none)
+
+;; CRITICAL: Never mix both! Our execution redefines storep, funcinst, etc.
 ```
 
-### Test Pattern (assert-event)
+### assert-event Pattern (VERIFIED)
 ```lisp
-;; Ground-truth execution test (computes concretely, no proofs needed)
+;; assert-event succeeds silently (prints :PASSED) or aborts with error
 (assert-event
- (let ((result (run 4
-                    (make-state :store :fake
-                                :call-stack (list (make-frame :return-arity 1
-                                                              :locals (list (make-i32-val 3) (make-i32-val 4))
-                                                              :operand-stack (empty-operand-stack)
-                                                              :instrs '((:local.get 1) (:local.get 0) (:i32.add)))
-                                                  (make-frame :return-arity 0
-                                                              :locals nil
-                                                              :operand-stack (empty-operand-stack)
-                                                              :instrs nil))))))
-   (and (statep result)
-        (equal (top-operand (current-operand-stack result))
-               (make-i32-val 7)))))
+ (equal (top-operand
+          (current-operand-stack
+            (run 4
+              (make-state :store :fake
+                :call-stack (list (make-frame :return-arity 1
+                                   :locals (list (make-i32-val 3) (make-i32-val 4))
+                                   :operand-stack (empty-operand-stack)
+                                   :instrs '((:local.get 0) (:local.get 1) (:i32.add)))
+                                  (make-frame :return-arity 0 :locals nil
+                                   :operand-stack (empty-operand-stack) :instrs nil))))))
+        (make-i32-val 7)))
+(cw "TEST PASSED: add(3,4)=7~%")
 ```
+
+### Independent Package Setup (VERIFIED 2026-04-18)
+To certify our execution.lisp outside the Kestrel tree, copy these files from
+`/tmp/acl2-full/books/kestrel/wasm/` into our directory:
+```
+package.lsp       — WASM package definition (defpkg "WASM" ...)
+portcullis.lisp   — Empty book (portcullis trigger)
+portcullis.acl2   — (ld "package.lsp") command
+execution.acl2    — Create with: (ld "package.lsp")   ← REQUIRED for cert.pl
+```
+Certification:
+```bash
+# portcullis first (creates portcullis.cert), then execution
+books/build/cert.pl --acl2 $ACL2 /path/to/our/portcullis
+books/build/cert.pl --acl2 $ACL2 /path/to/our/execution
+```
+**Key**: cert.pl uses `execution.acl2` to load the WASM package before certifying.
+Without it, `(in-package "WASM")` in execution.lisp fails with "unknown package".
 
 ---
 
@@ -98,22 +149,34 @@ frame = { LOCALS val*, MODULE moduleinst }
 admininstr = instr | CALL_ADDR funcaddr | LABEL_ n {instr*} admininstr* | FRAME_ n {frame} admininstr* | TRAP
 ```
 
-**Existing ACL2** (execution.lisp):
+**Kestrel Skeleton** (execution.lisp, 545 lines):
 ```lisp
 (defaggregate state   ((store storep) (call-stack call-stackp+consp)))
-(defaggregate frame   ((return-arity natp) (locals val-listp) (operand-stack operand-stackp) (instrs instr-listp)))
-;; call-stack = list of frames (implicit FRAME_ nesting)
-;; No LABEL_ handling yet — blocks/loops unimplemented
+(defaggregate frame   ((return-arity natp) (locals val-listp)
+                       (operand-stack operand-stackp) (instrs instr-listp)))
+;; Only i32.add + local.get, store is untyped (anything passes storep)
 ```
 
-**Key design decision**: The existing skeleton models execution as a list of
-instructions-to-execute per frame with an explicit call stack, rather than
-SpecTec's admin-instruction stack with nested LABEL_ and FRAME_ contexts.
+**Our Implementation** (execution.lisp, ~2100 lines):
+```lisp
+(defaggregate funcinst ((param-count natp) (local-count natp)
+                        (return-arity natp) (body true-listp)))
+(defaggregate globalinst ((value true-listp) (mutability booleanp)))
+(defaggregate frame ((return-arity natp) (locals val-listp)
+                     (operand-stack operand-stackp) (instrs true-listp)
+                     (label-stack true-listp)))
+(defaggregate state ((store storep)       ;; list of funcinst
+                     (call-stack ...)     ;; list of frames
+                     (memory byte-listp)  ;; flat byte list (pages × 65536)
+                     (globals true-listp) ;; list of globalinst
+                     (table true-listp))) ;; list of func indices
+```
 
-**For blocks/loops**: Need to extend the frame or add a label stack. Options:
-1. **Add label-stack to frame**: Each frame gets a stack of `(arity . continuation-instrs)` pairs. `br N` pops N labels.
-2. **Flatten to admin instructions**: More faithful to spec but harder to prove things about.
-3. **Hybrid**: Keep instruction pointer + label stack (recommended — matches existing style).
+**Key design decisions**:
+1. **Label stack in frame** (not admin-instruction nesting): Each frame has a label stack of `(arity continuation-instrs base-operand-height)` triples. `br N` pops N+1 labels.
+2. **Instruction lists are `true-listp`** (not `instr-listp`): Relaxed type to support nested block/loop/if instructions without circular recognizer definitions.
+3. **Store = list of funcinst**: Simplified from SpecTec's full store; funcinst captures (param-count, local-count, return-arity, body).
+4. **Memory = flat byte list**: `(make-list (* pages 65536) :initial-element 0)`. Access via `nth`/`update-nth`.
 
 ### 2.3 Value Types
 
@@ -123,20 +186,25 @@ valtype = I32 | I64 | F32 | F64
 val = CONST valtype val_(valtype)
 ```
 
-**Existing ACL2** (only i32):
+**Our ACL2** (implemented):
 ```lisp
-(defund i32-valp (val)  ;; (:i32.const <u32>)
-(defund valp (val) (or (i32-valp val)))
+(defund i32-valp (val) ...)     ;; (:i32.const <u32>), u32p = unsigned-byte-p 32
+(defund i64-valp (val) ...)     ;; (:i64.const <u64>), unsigned-byte-p 64
+(defund f32-valp (val) ...)     ;; (:f32.const <rational>), rationalp (approximate)
+(defund f64-valp (val) ...)     ;; (:f64.const <rational>), rationalp (approximate)
+(defund valp (val) (or (i32-valp val) (i64-valp val) (f32-valp val) (f64-valp val)))
+
+;; Constructors
+(defund make-i32-val (x) (list :i32.const x))
+(defund make-i64-val (x) (list :i64.const x))
+
+;; Type extraction
+(defun val-type (v) (car v))    ;; → :i32.const, :i64.const, etc.
 ```
 
-**Extension needed**:
-```lisp
-;; Add recognizers:
-(defund i64-valp (val) ...)     ;; (:i64.const <u64>)
-(defund f32-valp (val) ...)     ;; (:f32.const <ieee754-32>)
-(defund f64-valp (val) ...)     ;; (:f64.const <ieee754-64>)
-(defund valp (val) (or (i32-valp val) (i64-valp val) (f32-valp val) (f64-valp val)))
-```
+**Note on floats**: f32/f64 use ACL2 rationals as approximation. Full IEEE 754
+conformance (NaN, ±Infinity, signed zero, denormals) requires explicit bitvector
+representation — deferred to M11.
 
 ### 2.4 Instruction Categories (1-syntax.spectec)
 
@@ -178,6 +246,46 @@ rule Step_pure/binop-val:
        (state (update-current-operand-stack ostack state))
        (state (update-current-instrs (rest (current-instrs state)) state)))
     state))
+```
+
+**DRY macros** (implemented):
+```lisp
+;; Defines execute-i32.<op> with 2 args from stack, applies bv-fn
+(defmacro def-i32-binop (name bv-fn)
+  `(defun ,(intern-in-package-of-symbol (concatenate 'string "EXECUTE-I32." (symbol-name name)) 'wasm::foo) (state)
+     ...))
+
+;; Similarly: def-i32-relop (comparison ops → i32 0/1)
+;; Similarly: def-i32-unop (1 arg from stack)
+;; Similarly: def-packed-load, def-packed-store (memory ops with byte width)
+```
+
+**Block/loop execution pattern**:
+```lisp
+;; (:block arity (body-instrs...))
+;; Push label, set instrs to body, save continuation
+(defun execute-block (arity body-instrs state)
+  (b* ((ostack (current-operand-stack state))
+       (rest-instrs (rest (current-instrs state)))
+       (label (list arity rest-instrs (operand-stack-height ostack)))
+       (state (push-label label state))
+       (state (update-current-instrs body-instrs state)))
+    state))
+
+;; (:loop arity (body-instrs...))
+;; Like block but continuation re-enters the loop
+(defun execute-loop (arity body-instrs state)
+  (b* (... (continuation (cons (list :loop arity body-instrs) rest-instrs))
+       (label (list 0 continuation (operand-stack-height ostack))) ...)
+    state))
+```
+
+**Branch (br N)**:
+```lisp
+;; Pop N+1 labels, trim operand stack to base + arity values, jump to continuation
+(defun execute-br (n state)
+  ;; Peel labels one at a time, then jump to continuation of the Nth label
+  ...)
 ```
 
 ---
@@ -480,47 +588,119 @@ The parser is mostly complete; the execution engine is what needs extension.
 
 ## 10. Key Decisions Log
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| State model | Extend existing skeleton (call-stack + frame) | Compatible with existing proofs; pragmatic |
-| Label/block model | Label stack in frame with base-height tracking | Avoids admin-instruction nesting; cleaner for proofs |
-| Floating-point | Defer to Phase 2 | Integer-only MVP is sufficient |
-| Value representation | S-expressions `(:i32.const n)` | Consistent with existing code |
-| Instruction representation | Keyword S-expressions `(:i32.add)` | Consistent with parser output |
-| Store | Replace `:fake` with proper defaggregate | Required for globals, memory, function calls |
-| BV operations | Use kestrel/bv library | Well-tested, theorem-rich library |
-| Testing | assert-event for concrete + defthm for symbolic | Both patterns proven in existing code |
+| Decision | Choice | Rationale | Outcome |
+|---|---|---|---|
+| State model | Extend skeleton (call-stack + frame) | Compatible with existing proofs | ✅ Works well |
+| Label/block model | Label stack in frame | Cleaner for proofs than admin-instrs | ✅ Proven correct |
+| Floating-point | Rationals (defer IEEE 754) | Integer-only MVP first | 🔶 Needs NaN/Inf |
+| Value representation | `(:i32.const n)` S-exprs | Consistent with existing code | ✅ Clean |
+| Instruction representation | Keyword S-exprs + nested blocks | Consistent with parser output | ✅ Clean |
+| Store | List of funcinst (defaggregate) | Required for function calls | ✅ Works |
+| BV operations | kestrel/bv library | Well-tested, theorem-rich | ✅ Essential |
+| Testing | assert-event + defthm + E2E oracle | Multiple levels of assurance | ✅ Robust |
+| Package independence | Own package.lsp + portcullis | Needed for cert outside Kestrel tree | ✅ Resolved |
+| instrp guard | `true-listp` not `instr-listp` | Nested blocks can't use strict recognizer | ✅ Pragmatic |
 
 ---
 
-## 11. File Organization Plan
+## 11. E2E Validation Pipeline
 
+### Architecture
 ```
-books/kestrel/wasm/
-├── package.lsp              # (exists) WASM package definition
-├── portcullis.lisp          # (exists) portcullis
-├── portcullis.acl2          # (exists) portcullis commands
-├── acl2-customization.lsp   # (exists) customization
-│
-├── types.lisp               # NEW: value types, type recognizers (i32, i64, f32, f64)
-├── numerics.lisp            # NEW: all numeric operations (using kestrel/bv)
-├── store.lisp               # NEW: store, instances, module-inst
-├── execution.lisp           # (exists) EXTEND: state, frame, step, run + all instructions
-├── blocks.lisp              # NEW: label stack, block/loop/if/br execution
-├── memory.lisp              # NEW: memory load/store operations
-├── modules.lisp             # NEW: allocation, instantiation, invocation
-│
-├── parse-binary.lisp        # (exists) binary parser
-│
-├── proof-support.lisp       # (exists) EXTEND: more defopeners
-├── add-proof.lisp           # (exists) add correctness proof
-├── tests.lisp               # NEW: comprehensive assert-event test suite
-├── factorial-proof.lisp     # NEW: factorial example proof
+                  wat2wasm         wasm2acl2.js
+add.wat ─────────► add.wasm ──────────────────► test-e2e-add.lisp
+                                  │                    │
+                                  │ Node.js WASM       │ ACL2
+                                  │ runtime            │ execution
+                                  ▼                    ▼
+                              expected: 7          result: 7
+                                  │                    │
+                                  └──── compare ───────┘
+```
+
+### wasm2acl2.js — WASM Binary Parser + ACL2 Translator
+- Parses WASM binary sections: Type, Function, Export, Code, Memory
+- Maps WASM opcodes to ACL2 S-expression instruction form
+- Executes each test case in Node.js WASM runtime for ground-truth expected values
+- Generates complete ACL2 `.lisp` file with `assert-event` checks
+- Key fixes:
+  - **Negative args**: JS `args[i] >>> 0` for i32 unsigned conversion
+  - **Memory instructions**: Extract offset from memarg: `(:i32.load offset)` not `(:i32.load)`
+  - **Buffer.byteOffset**: Node.js Buffer shares ArrayBuffer; must use `buf.buffer.slice(buf.byteOffset, ...)`
+
+### Test Spec Format (JSON)
+```json
+{
+  "function": "add",
+  "tests": [
+    {"args": [3, 4], "expected": 7},
+    {"args": [0, 0], "expected": 0},
+    {"args": [-1, 1], "expected": 0}
+  ]
+}
+```
+
+### Running E2E Tests
+```bash
+# Prerequisites: wat2wasm (wabt), node.js
+# 1. Compile WAT
+wat2wasm add.wat -o add.wasm
+
+# 2. Generate ACL2 test (also runs Node.js for expected values)
+node wasm2acl2.js add.wasm add.json > test-e2e-add.lisp
+
+# 3. Run in ACL2
+echo '(ld "test-e2e-add.lisp") (quit)' | $ACL2 2>&1 | grep "=== ALL"
 ```
 
 ---
 
-## 12. WASM 1.0 Instruction Opcode Quick Reference
+## 12. File Organization (actual)
+
+```
+examples/wasm1-acl2-formalization-plan/
+├── package.lsp              # WASM package (copied from Kestrel)
+├── portcullis.lisp          # Portcullis (copied from Kestrel)
+├── portcullis.acl2          # Portcullis commands
+├── execution.lisp           # Main semantics (~2100 lines, 102 instructions)
+├── validation.lisp          # Type checker (M9)
+├── tests/
+│   ├── test-m1-instructions.lisp   # i32 arith/cmp/parametric
+│   ├── test-m2-control-flow.lisp   # block/loop/if/br
+│   ├── test-m3-functions.lisp      # call, funcinst, store
+│   ├── test-m4-memory.lisp         # load/store, memory ops
+│   ├── test-m5-i64.lisp            # i64 operations
+│   ├── test-m5b-globals.lisp       # global.get/set
+│   ├── test-m7a-floats.lisp        # f32/f64 operations
+│   ├── test-m7b-tables.lisp        # call_indirect, tables
+│   ├── test-m9-validation.lisp     # type checking tests
+│   ├── test-packed-mem.lisp        # packed i32 memory
+│   ├── test-packed-mem-i64.lisp    # packed i64 memory
+│   └── test-spot-check.lisp        # 20 cross-cutting tests
+├── proofs/
+│   ├── proof-add-spec.lisp         # add correctness + commutativity
+│   ├── proof-sub-spec.lisp         # sub correctness + cancellation
+│   ├── proof-abs-e2e.lisp          # abs program proof
+│   ├── proof-block-br-spec.lisp    # block/br correctness
+│   ├── proof-loop-spec.lisp        # loop correctness
+│   ├── proof-max-if-else.lisp      # max(a,b) proof
+│   ├── proof-mem-roundtrip.lisp    # store→load roundtrip
+│   ├── proof-bitwise.lisp          # bitwise properties
+│   ├── proof-validation-soundness.lisp  # type safety
+│   ├── proof-e2e-pipeline.lisp     # capstone: validate+execute
+│   └── ... (15 total)
+├── e2e/
+│   ├── wasm2acl2.js               # WASM binary → ACL2 translator
+│   ├── {add,abs,factorial,fibonacci,memory_store_load}.wat
+│   ├── {add,abs,factorial,fibonacci,memory_store_load}.wasm
+│   └── {add,abs,factorial,fibonacci,memory_store_load}.json
+├── WASM1_PLAN.md
+└── ACL2_SEMANTICS_REF.md
+```
+
+---
+
+## 13. WASM 1.0 Instruction Opcode Quick Reference
 
 ### Control (0x00-0x11)
 ```
@@ -560,12 +740,166 @@ books/kestrel/wasm/
 
 ---
 
-## 13. External References
+## 14. Other Kestrel ASM Models (patterns to follow)
+
+### Kestrel EVM Model (`books/kestrel/ethereum/evm/`)
+- **1779 lines** in `evm.lisp`, 67 definitions
+- Uses `std::defaggregate` for `account-state`, `transaction`, `block-header`
+- Separate files: `evm.lisp` (core), `evm-rules.lisp` (rewrite rules), `evm-tests.lisp` (tests), `support.lisp`
+- Pattern: state is big aggregate, step function dispatches on opcode, run loops step N times
+
+### Kestrel JVM Model (`books/kestrel/jvm/`)
+- **87 files**, mature model
+- Separate files for: `states.lisp`, `execution.lisp`, `execution2.lisp`, `call-stacks.lisp`, `class-file-parser.lisp`
+- `symbolic-execution.lisp` for symbolic evaluation
+- Pattern to emulate: split large execution into execution.lisp (core) + blocks.lisp + memory.lisp
+
+### Common Patterns Across Kestrel ASM Models
+1. `defaggregate` for state structures (not `defstobj`)
+2. `defund` for core operations (enables explicit `enable` in proofs)
+3. `defopeners` for recursive functions used in proofs
+4. `assert-event` for concrete ground-truth tests
+5. `defthm` with `:in-theory (enable ...)` for symbolic proofs
+6. Package isolation via `package.lsp` → `portcullis.acl2` → `portcullis.lisp`
+
+---
+
+## 15. External References
 
 - **WASM 1.0 SpecTec**: `https://github.com/WebAssembly/spec/tree/main/specification/wasm-1.0`
 - **WASM 1.0 Spec (HTML)**: `https://www.w3.org/TR/wasm-core-1/`
+- **WASM 1.0 Spec Test Suite**: `https://github.com/WebAssembly/spec/tree/main/test/core`
 - **Kestrel WASM books**: `https://github.com/acl2/acl2/tree/master/books/kestrel/wasm`
 - **Kestrel EVM model**: `https://github.com/acl2/acl2/tree/master/books/kestrel/ethereum/evm`
+- **Kestrel JVM model**: `https://github.com/acl2/acl2/tree/master/books/kestrel/jvm`
 - **Kestrel BV library**: `https://github.com/acl2/acl2/tree/master/books/kestrel/bv`
 - **ACL2 documentation**: `https://www.cs.utexas.edu/users/moore/acl2/manuals/current/manual/`
 - **defaggregate**: `https://www.cs.utexas.edu/users/moore/acl2/manuals/current/manual/?topic=STD____DEFAGGREGATE`
+- **cert.pl**: `https://www.cs.utexas.edu/users/moore/acl2/manuals/current/manual/?topic=BUILD____CERT.PL`
+
+---
+
+## 16. Troubleshooting Guide
+
+### "Symbol STOREP not found" or redefinition errors
+- Cause: Loading both Kestrel's execution AND our execution in same session
+- Fix: Use only one; update test headers to use our package.lsp + our include-book
+
+### "Certification loop" or "include-book not found"
+- Cause: Missing .cert for dependency
+- Fix: Certify portcullis first, then execution: `cert.pl --acl2 $ACL2 /path/to/portcullis && cert.pl --acl2 $ACL2 /path/to/execution`
+
+### "Guard violation in BVPLUS/BVMINUS"
+- Cause: Arguments not proven to be `unsigned-byte-p 32`
+- Fix: Add `(unsigned-byte-p 32 x)` hypotheses; enable `bvplus-of-bvuminus-when-bvle`
+
+### "The proof attempt has failed" (defthm)
+- Cause: Usually needs more functions enabled or missing :expand hints
+- Fix: Add `:in-theory (enable fn1 fn2 ...)` and `:expand ((:free (n s) (run n s)))`
+- NEVER put macros (advance-instrs, ffn-symb) in enable lists
+
+### "ACL2 crashed" or session hung
+- Cause: Infinite loop in ACL2 term rewriting, or memory exhaustion
+- Fix: Kill ACL2 process; add `:do-not '(generalize)` to hints; reduce step count in `run`
+
+### E2E test values mismatch
+- Cause: Signed/unsigned confusion between JS and ACL2
+- Fix: Always convert JS signed → unsigned: `(result >>> 0)` for i32, `BigInt.asUintN(32, result)` for i32
+
+---
+
+## 17. Critical Gotchas — Hard-Won Lessons (VERIFIED 2026-04-18)
+
+These were discovered through actual certification attempts and are essential
+for any agent session extending the Kestrel execution.lisp.
+
+### 17.1 defaggregate generates `name-p` not `namep`
+```lisp
+;; By default, (std::defaggregate frame ...) generates predicate `frame-p`
+;; Kestrel uses :pred framep to override this:
+(std::defaggregate frame
+  ((return-arity natp)
+   (locals val-listp)
+   (operand-stack operand-stackp)
+   (instrs true-listp))
+  :pred framep)     ;; ← REQUIRED if using "framep" elsewhere
+
+;; Same for state:
+(std::defaggregate state
+  ((store storep)
+   (call-stack (and (call-stackp call-stack) (consp call-stack))))
+  :pred statep)     ;; ← REQUIRED
+```
+
+### 17.2 Package imports: bvplus is imported, bvminus is NOT
+The WASM package (package.lsp) imports `bvplus` but NOT `bvminus`, `bvxor`,
+`bvand`, `bvor`, `bvshl`, `bvshr`, or other BV operations. Use `acl2::` prefix:
+```lisp
+(make-i32-val (acl2::bvminus 32 (farg1 val1) (farg1 val2)))
+(make-i32-val (acl2::bvand 32 (farg1 val1) (farg1 val2)))
+```
+
+### 17.3 Definition ordering: dispatch AFTER all handler defs
+`execute-instr` must be defined AFTER all `execute-i32.xxx` functions it
+dispatches to. ACL2 is strictly single-pass:
+```lisp
+;; 1. Define all instruction handlers first
+(defun execute-i32.add ...)
+(defun execute-i32.sub ...)
+(defun execute-i32.mul ...)
+
+;; 2. THEN the dispatch table
+(defund execute-instr ...)
+```
+
+### 17.4 Guard verification: match Kestrel patterns exactly
+New instruction handlers MUST match the guard hint pattern:
+```lisp
+;; i32-vals function — enable i32-valp and u32p
+(defund i32.sub-vals (val1 val2)
+  (declare (xargs :guard (and (i32-valp val1) (i32-valp val2))
+                  :guard-hints (("Goal" :in-theory (enable i32-valp u32p)))))
+  ...)
+
+;; execute function — enable valp, i32-valp, u32p
+;; If guard fails, add the *-vals function to the enable list:
+(defun execute-i32.sub (state)
+  (declare (xargs :guard (statep state)
+                  :guard-hints (("Goal" :in-theory (enable valp i32-valp u32p i32.sub-vals)))))
+  ...)
+```
+**If guard verification still fails**, use `:verify-guards nil` BUT then
+`execute-instr` won't certify (it requires all callees to have verified guards).
+In that case, also add `:verify-guards nil` to `execute-instr` and use
+`(set-guard-checking :none)` in tests.
+
+### 17.5 (set-guard-checking :none) for tests
+When guards aren't fully verified, tests MUST use `(set-guard-checking :none)`
+before any `assert-event`. Without this, ACL2 refuses to evaluate functions
+with unverified guards and returns `ACL2 Error [Evaluation]`:
+```lisp
+(set-guard-checking :none)
+(assert-event (equal (...) expected-value))
+;; → prints :PASSED on success
+```
+
+### 17.6 execution.acl2 required for independent certification
+When certifying execution.lisp outside the Kestrel tree, cert.pl needs an
+`execution.acl2` file containing `(ld "package.lsp")` in the same directory.
+Without it, the WASM package is unknown at certification time.
+
+### 17.7 state defaggregate: inline guard, not shorthand
+The call-stack field guard uses inline AND, not a combined predicate:
+```lisp
+;; WRONG: (call-stack call-stackp+consp)
+;; RIGHT:
+(call-stack (and (call-stackp call-stack) (consp call-stack)))
+```
+
+### 17.8 farg1 vs cadr for value access
+Kestrel uses `(farg1 val)` (from `kestrel/utilities/forms`) not `(cadr val)`:
+```lisp
+;; Access the numeric part of (:i32.const N):
+(farg1 val)         ;; Kestrel style — works with guard verification
+(cadr val)          ;; Raw — may fail guard proofs
+```
