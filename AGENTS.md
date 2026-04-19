@@ -107,8 +107,17 @@ Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 - **All non-float WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, memory, conversions
 - **Missing 14 float instructions**: copysign, nearest, trunc(f→f), reinterpret, f32/f64 load/store
 
+## Kestrel IEEE 754 Library (discovered 2026-04-19)
+`books/kestrel/floats/ieee-floats-as-bvs` provides exact IEEE 754 encode/decode:
+- `(include-book "kestrel/floats/ieee-floats-as-bvs" :dir :system)` — certifies in <1s
+- `(include-book "kestrel/floats/round" :dir :system)` — banker's rounding, certifies in 2s
+- `decode-bv-float32` / `decode-bv-float64` — BV → float datum
+- `encode-bv-float` — float datum → BV  
+- Roundtrip theorems proven (non-NaN)
+- **Integration proof**: `proof-ieee754-integration.lisp` — 14 PASSED, 3 Q.E.D.
+
 ## What's Next
-- Complete 14 remaining float instructions (requires IEEE 754 bit-level model)
+- Add 14 remaining float instructions using Kestrel ieee-floats library
 - Fix 3 float proof failures (theory hints need correct unfold list)
 - Guard verification (currently deferred with `:verify-guards nil`)
 - Module instantiation + binary parser integration

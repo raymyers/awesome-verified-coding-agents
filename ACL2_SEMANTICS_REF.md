@@ -945,19 +945,80 @@ f32.load         f64.load          — load float from memory
 f32.store        f64.store         — store float to memory
 ```
 
-### 18.3 Why these are hard in ACL2
-- **reinterpret**: Requires bit-level IEEE 754 representation (sign + exponent + mantissa encoding). ACL2 rationals don't have this; need explicit `(ieee754-bits-to-rational ...)` conversion functions.
-- **copysign**: Needs sign bit extraction from IEEE 754 representation.
-- **nearest**: Banker's rounding (round half to even) requires knowing the mantissa precision.
-- **trunc (float→float)**: Different from trunc(float→int) which we have; this preserves the float type.
-- **f32/f64 load/store**: Need `bytes-to-f32`/`f32-to-bytes` which depend on IEEE 754 encoding.
+### 18.3 Kestrel IEEE 754 library — the solution (discovered 2026-04-19)
 
-### 18.4 Approach for completing float support
-1. Define `ieee754-encode-f32` / `ieee754-decode-f32` (and f64 variants) as ACL2 functions
-2. These map between ACL2 rationals and 32/64-bit unsigned integers (bit patterns)
-3. reinterpret becomes trivial: just call encode/decode
-4. copysign, nearest, trunc become expressible in terms of the encoded representation
-5. f32/f64 load/store use the encoding functions with the existing byte read/write infrastructure
+**`books/kestrel/floats/`** contains a certified IEEE 754 formalization by Eric Smith
+that provides exactly what we need. All books certify in <4 seconds.
+
+| Book | Lines | Key Functions | Status |
+|---|---|---|---|
+| `ieee-floats.lisp` | 1467 | `formatp`, `decode`, `encode`, `floating-point-datump`, special values (NaN, ±∞, ±0) | ✅ Certified |
+| `ieee-floats-as-bvs.lisp` | 185 | `decode-bv-float32`, `decode-bv-float64`, `encode-bv-float`, roundtrip theorems | ✅ Certified |
+| `round.lisp` | 809 | `round-to-nearest-integer-ties-to-even`, `round-rational-ties-to-even` | ✅ Certified |
+| `ieee-floats-tests.lisp` | 34 | Exhaustive minifloat (4-bit) tests | ✅ Certified |
+| `ieee-floats-validation.lisp` | 219 | Additional validation | ✅ Certified |
+
+**Key proven theorems from the library:**
+```lisp
+;; Roundtrip: encode(decode(bv)) = bv  (for non-NaN)
+(defthm encode-bv-float-of-decode-bv-float-when-not-nan ...)
+
+;; Roundtrip: decode(encode(datum)) = datum
+(defthm decode-bv-float-of-encode-bv-float ...)
+
+;; Decoded non-special values are rational
+(defthm rationalp-of-decode-bv-float32 ...)
+```
+
+**Integration verified (proof-ieee754-integration.lisp): 14 PASSED, 3 Q.E.D.**
+- `decode-bv-float32(0x3F800000) = 1` (1.0f)
+- `decode-bv-float32(0x3F000000) = 1/2` (0.5f)
+- `decode-bv-float32(0xBF800000) = -1` (-1.0f)
+- `encode-bv-float(32, 24, 1, nil) = 0x3F800000` (encode 1.0f)
+- Roundtrip `i32 → f32 → i32` preserves bits for 1.0f, -2.0f, +∞
+- Banker's rounding: `round-to-nearest-integer-ties-to-even(5/2) = 2`
+
+### 18.4 Approach for completing float support using Kestrel library
+
+Each of the 14 missing instructions maps directly to library functions:
+
+| Missing Instruction | Implementation |
+|---|---|
+| `f32.reinterpret_i32` | `(decode-bv-float32 bits)` — decode i32 bit pattern as float |
+| `i32.reinterpret_f32` | `(encode-bv-float 32 24 datum nil)` — encode float as i32 bits |
+| `f64.reinterpret_i64` | `(decode-bv-float64 bits)` — decode i64 bit pattern as float |
+| `i64.reinterpret_f64` | `(encode-bv-float 64 53 datum nil)` — encode float as i64 bits |
+| `f32.copysign` | `(negate-floating-point-datum ...)` + sign extraction |
+| `f64.copysign` | Same as f32.copysign with 64-bit format |
+| `f32.nearest` | `(round-to-nearest-integer-ties-to-even x)` for the rational value |
+| `f64.nearest` | Same as f32.nearest |
+| `f32.trunc` | `(int-part x)` then round toward zero |
+| `f64.trunc` | Same as f32.trunc |
+| `f32.load` | `bytes-to-i32` (existing) → `decode-bv-float32` |
+| `f64.load` | `bytes-to-i64` (existing) → `decode-bv-float64` |
+| `f32.store` | `encode-bv-float` → `i32-to-bytes` (existing) |
+| `f64.store` | `encode-bv-float` → `i64-to-bytes` (existing) |
+
+**The `include-book` is:**
+```lisp
+(include-book "kestrel/floats/ieee-floats-as-bvs" :dir :system)
+(include-book "kestrel/floats/round" :dir :system)
+```
+
+### 18.4.1 Other IEEE 754 libraries in ACL2 (for reference)
+
+- **`books/rtl/rel11/`** — Russinoff's RTL library. Comprehensive theory for hardware FPU
+  verification (AMD/Intel). Uses RTL package. More mature but harder to integrate with
+  our WASM model. Provides `rnd`, `rtz`, `raz` rounding modes.
+
+- **`books/centaur/lispfloat/`** — Centaur's Lisp float wrapper. Uses constrained functions
+  backed by Common Lisp floats. Not useful for logical proofs (no definition in logic).
+
+- **`books/kestrel/jvm/float-to-bits.lisp`** — JVM-specific float-to-bits conversion.
+  Experimental/draft status. Uses RTL `expo`/`sig` functions.
+
+- **`books/kestrel/x86/floats.lisp`** — x86-specific float rules. Depends on x86isa project.
+  Not suitable for standalone WASM use.
 
 ### 18.5 SpecTec reduction rules covered
 

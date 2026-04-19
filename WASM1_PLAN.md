@@ -176,16 +176,27 @@ For loops, continuation re-enters the loop instruction.
 - [x] f32/f64 comparisons (eq, ne, lt, gt, le, ge)
 - [x] f32/f64 unary ops (abs, neg, sqrt, ceil, floor, trunc, nearest)
 
-### Remaining
-- [ ] IEEE 754 edge cases: NaN propagation, signed zero, denormals
-- [ ] f32.min/f64.min, f32.max/f64.max (NaN handling)
+### Remaining (14 instructions)
 - [ ] f32.copysign/f64.copysign
-- [ ] Conversion ops: f32.convert_i32_u/s, f64.convert_i32_u/s, etc.
-- [ ] f32.demote_f64, f64.promote_f32
-- [ ] f32.reinterpret_i32, f64.reinterpret_i64 (and vice versa)
+- [ ] f32.nearest/f64.nearest (banker's rounding)
+- [ ] f32.trunc/f64.trunc (float→float truncation)
+- [ ] f32.reinterpret_i32, i32.reinterpret_f32
+- [ ] f64.reinterpret_i64, i64.reinterpret_f64
+- [ ] f32.load/f64.load, f32.store/f64.store
+- [ ] IEEE 754 edge cases: NaN propagation in existing ops
 
-**Note**: ACL2 rationals model IEEE 754 approximately. Full conformance requires
-explicit NaN/infinity representation (see ACL2_SEMANTICS_REF.md §6).
+### Path Forward: Kestrel IEEE 754 Library (discovered 2026-04-19)
+
+**`books/kestrel/floats/ieee-floats-as-bvs`** provides all needed primitives:
+- `decode-bv-float32` / `decode-bv-float64` — BV → IEEE datum
+- `encode-bv-float` — IEEE datum → BV
+- Proven roundtrip theorems (encode∘decode = id for non-NaN)
+- Special values: `:float-nan`, `:float-positive-infinity`, etc.
+- `round-to-nearest-integer-ties-to-even` — banker's rounding
+
+**Integration verified**: `proof-ieee754-integration.lisp` — 14 PASSED, 3 Q.E.D.
+All 14 remaining instructions have concrete implementation paths.
+See ACL2_SEMANTICS_REF.md §18.3-18.4 for details.
 
 ---
 
