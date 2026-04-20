@@ -1278,3 +1278,93 @@ Proved symbolic properties (all ∀x,y ∈ u32):
 | rem_s(MIN,-1) | 0 (NOT trap) | ✅ concrete |
 | div_s(-7,2) | -3 (truncate toward zero) | ✅ concrete |
 | rem_s(-7,2) | -1 (sign follows dividend) | ✅ concrete |
+
+---
+
+## §20. IEEE 754 Signed Zero (M13, 2026-04-20)
+
+### 20.1 Representation
+
+Four new float-specialp atoms extending the existing NaN/Inf atoms:
+
+| Atom | Meaning | IEEE 754 sign bit |
+|------|---------|-------------------|
+| `:f32.+0` | f32 positive zero | 0 |
+| `:f32.-0` | f32 negative zero | 1 |
+| `:f64.+0` | f64 positive zero | 0 |
+| `:f64.-0` | f64 negative zero | 1 |
+
+Regular `(:f32.const 0)` (rational 0) is **positive zero** in arithmetic context.
+`f32.neg((:f32.const 0)) = :f32.-0` (detected via `(= (farg1 arg) 0)` check).
+
+### 20.2 Operations with ±0
+
+| Operation | Input | Result |
+|-----------|-------|--------|
+| `f32.neg` | `+0` (rational or :f32.+0) | `:f32.-0` |
+| `f32.neg` | `:f32.-0` | `:f32.+0` |
+| `f32.abs` | `±0` | `:f32.+0` |
+| `f32.eq`  | `+0, -0` | `1` (they compare equal) |
+| `f32.ne`  | `+0, -0` | `0` |
+| `f32.lt`  | `+0, -0` | `0` |
+| `f32.div` | `x > 0, +0` | `:f32.+inf` |
+| `f32.div` | `x > 0, -0` | `:f32.-inf` |
+| `f32.div` | `x < 0, -0` | `:f32.+inf` |
+| `f32.copysign` | `x, -0` | negative `|x|` |
+| `f32.copysign` | `x, +0` | positive `|x|` |
+| `f32.add/sub/mul` | `±0, ±0` | rational `0` (sign lost) |
+
+### 20.3 Implementation Pattern
+
+**Macros** (`def-f32-binop`, `def-f32-cmpop` etc.) extended to accept ±0 as rational 0:
+```lisp
+;; Accept finite f32-valp or signed zeros (±0 treated as rational 0)
+((when (not (and (or (f32-valp arg1) (eq arg1 :f32.+0) (eq arg1 :f32.-0))
+                 (or (f32-valp arg2) (eq arg2 :f32.+0) (eq arg2 :f32.-0))))) :trap)
+(v1 (if (f32-valp arg1) (farg1 arg1) 0))
+(v2 (if (f32-valp arg2) (farg1 arg2) 0))
+```
+
+**Sign helpers**: `f32-sign-negativep` / `f64-sign-negativep`:
+```lisp
+(defun f32-sign-negativep (arg)
+  (or (eq arg :f32.-0) (eq arg :f32.-inf)
+      (and (f32-valp arg) (< (farg1 arg) 0))))
+```
+
+### 20.4 Proof Techniques
+
+All signed-zero theorems are concrete evaluations:
+```lisp
+(defthm f32-pos-neg-zero-eq
+  (equal (sz-top 4 (list '(:f32.const 0) '(:f32.const 0) '(:f32.neg) '(:f32.eq)))
+         (make-i32-val 1))
+  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+                  :expand ((:free (n s) (run n s))))))
+```
+
+For theorems about pre-loaded special atoms, use pre-populated operand stacks:
+```lisp
+;; Test neg(:f32.-0) = :f32.+0
+(run 1 (make-state
+        :call-stack (list (make-frame ... :operand-stack (list :f32.-0)
+                                         :instrs (list '(:f32.neg)) ...))
+        ...))
+```
+
+### 20.5 Proof Summary
+
+| File | Theorems | Content |
+|------|----------|---------|
+| `proof-signed-zero.lisp` | 11 | neg/abs/eq/ne/lt/div signed zero facts |
+| `proof-commutativity.lisp` | 10 | i32/i64 add/mul/and/or/xor commutativity |
+| `proof-associativity.lisp` | 10 | i32/i64 add/mul/and/or/xor associativity |
+| `proof-i64-algebraic.lisp` | 25 | i64 identity/annihilator/cmp/shift laws |
+
+### 20.6 Known Limitation
+
+Arithmetic operations (`add`, `sub`, `mul`) with ±0 inputs produce rational 0, losing
+the sign of zero. Per WASM 1.0 spec §3.3.1, operations like `(-0) × (+1)` should
+produce `-0`; our model gives `+0`. Only `neg`, `abs`, `copysign`, and `div` handle
+signed zero sign propagation correctly. This is documented in `WASM1_PLAN.md §11.2`.
+

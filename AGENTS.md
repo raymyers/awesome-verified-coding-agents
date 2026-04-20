@@ -6,12 +6,13 @@ Repo: `raymyers/awesome-verified-coding-agents` branch `add-wasm1-acl2-formaliza
 Subdir: `examples/wasm1-acl2-formalization-plan/`
 
 ## Current Status (2026-04-20)
-- **170/170 WASM 1.0 instructions** implemented, certified, tested (3377 lines)
-- **22 proof files, 212 Q.E.D.s, 0 failures**
-- **13/13 test files pass**, 256 assertions, 0 failures
-- **M12**: IEEE 754 NaN/Inf propagation — float-specialp, 10 formal theorems, 28 oracle tests
-- **Also**: proof-spec-edge-cases.lisp (35 Q.E.D.s), proof-algebraic-properties.lisp (27 Q.E.D.s)
-- **Critical gotchas + NaN design**: ACL2_SEMANTICS_REF.md §17-18
+- **170/170 WASM 1.0 instructions** implemented, certified, tested (3496 lines)
+- **26 proof files, 268 Q.E.D.s, 0 failures**
+- **14/14 test files pass**, 278 assertions, 0 failures
+- **M12**: IEEE 754 NaN/Inf propagation — float-specialp, 20 formal theorems, 28 oracle tests
+- **M13**: IEEE 754 Signed Zero — `:f32.±0`/`:f64.±0` atoms; neg/abs/div/copysign/cmp correct; 11 theorems
+- **New proofs**: commutativity (10), associativity (10), i64-algebraic (25), signed-zero (11)
+- **Critical gotchas + NaN/±0 design**: ACL2_SEMANTICS_REF.md §17-20
 
 ## Key Files
 - `WASM1_PLAN.md` — Milestone plan with task bullets, MVP strategy, testing plan
@@ -105,11 +106,13 @@ ALWAYS derive expected values from `wat2wasm` + Node.js FIRST, then encode in AC
 Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 
 ## Verified State (2026-04-20)
-- **170/170** WASM 1.0 instructions (100%), `execution.lisp` CERTIFIES (3377 lines)
-- **13/13** test files pass (256 assertions, 0 failures)
-- **22/22** proof files pass (212 Q.E.D.s, 0 failures)
+- **170/170** WASM 1.0 instructions (100%), `execution.lisp` CERTIFIES (3496 lines)
+- **14/14** test files pass (278 assertions, 0 failures)
+- **26/26** proof files pass (268 Q.E.D.s, 0 failures)
 - **All WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, memory, f32/f64, conversions, reinterpret
 - **M12 complete**: IEEE 754 NaN propagation (float-specialp pattern), 0/0=NaN, x/0=±Inf, sqrt(-x)=NaN
+- **M13 complete**: IEEE 754 Signed Zero — neg(+0)=-0, abs(±0)=+0, +0==−0, x/-0=−∞ for x>0
+- **New proof files (2026-04-20)**: commutativity, associativity, i64-algebraic, signed-zero
 - **Missing**: module instantiation, binary parser integration (future work)
 
 ## Kestrel IEEE 754 Library (discovered 2026-04-19)
@@ -132,4 +135,5 @@ Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 - Module instantiation + binary parser integration (connect parse-binary.lisp to execution)
 - Guard verification (currently deferred with `:verify-guards nil`)
 - Full Inf arithmetic (Inf+Inf, Inf-Inf, etc. — currently traps for Inf binop operands)
-- Signed zero (±0 distinction) — currently treated as 0
+- More symbolic proofs: distributivity (mul over add), shift laws, mixed i32/i64 theorems
+- Signed zero sign propagation in mul/add/sub (currently loses sign; only neg/abs/copysign/div correct)

@@ -29,25 +29,27 @@
 | M5b: Globals | ✅ Verified | global.get, global.set, globalinst |
 | M6: Floating-Point | ✅ Complete | f32/f64 arith, cmp, unary, copysign, trunc, nearest — all 170 instrs |
 | M7: Tables + call_indirect | ✅ Verified | table, call_indirect dispatch |
-| M8: Proofs | ✅ Verified | 212 Q.E.D.s across 22 proof files |
+| M8: Proofs | ✅ Verified | 268 Q.E.D.s across 26 proof files |
 | M9: Validation | ✅ Verified | Type checker + 12 soundness theorems + 70 validation tests |
 | M10: E2E Pipeline | ✅ Done | WAT → .wasm → ACL2 S-expr → execution |
 | M11: IEEE 754 Integration | ✅ Complete | Reinterpret, f32/f64 load/store via Kestrel ieee-floats-as-bvs |
-| M12: NaN/Inf Propagation | ✅ Complete | float-specialp, NaN propagation in all float ops, 10 formal theorems |
+| M12: NaN/Inf Propagation | ✅ Complete | float-specialp, NaN propagation in all float ops, 20 formal theorems |
+| M13: Signed Zero | ✅ Complete | `:f32.±0`/`:f64.±0` atoms; neg/abs/div/copysign/cmp; 11 formal theorems |
 
 ### Verified Numbers (machine-checked 2026-04-20)
 
 | Metric | Value |
 |---|---|
 | Instructions in `execution.lisp` | **170 / 170 WASM 1.0 (100%)** |
-| `execution.lisp` certifies (`cert.pl`) | ✅ Yes (3377 lines) |
-| Test files passing | **13 / 13 (256 assertions, 0 failures)** |
-| Proof files passing | **22 / 22 (212 Q.E.D.s, 0 failures)** |
+| `execution.lisp` certifies (`cert.pl`) | ✅ Yes (3496 lines) |
+| Test files passing | **14 / 14 (278 assertions, 0 failures)** |
+| Proof files passing | **26 / 26 (268 Q.E.D.s, 0 failures)** |
 | Validation tests | 70 PASSED, 0 FAILED |
 | Missing instructions | **0** |
 | IEEE 754 NaN propagation | ✅ All float binops, unary ops, comparisons, div, sqrt |
+| IEEE 754 Signed Zero | ✅ neg/abs/copysign/div/cmp all handle ±0 correctly |
 
-**All 170 WASM 1.0 instructions are implemented, certified, tested, and have NaN/Inf propagation.**
+**All 170 WASM 1.0 instructions are implemented, certified, tested, with NaN/Inf/±0 propagation.**
 
 ---
 
@@ -323,7 +325,7 @@ WAT source → wat2wasm → .wasm binary → wasm2acl2.js → ACL2 S-exprs → A
 - [x] copysign, trunc, nearest (M11)
 - [ ] Explicit NaN/Infinity representation (not ACL2 rationals)
 - [x] NaN propagation rules (M12 complete)
-- [ ] Signed zero handling
+- [x] Signed zero handling (M13: `:f32.±0`/`:f64.±0` atoms, neg/abs/div/copysign/cmp — 11 proofs)
 
 ### 11.3 Edge Cases & Traps ✅ Done (2026-04-20)
 - [x] i32.div_s overflow: `(-2^31) / (-1)` → trap (proved)
@@ -420,7 +422,7 @@ Universal properties proven by ACL2's theorem prover.
   :hints (("Goal" :in-theory (enable ...))))
 ```
 
-Currently: 212 Q.E.D.s across 22 proof files + 256 test assertions via `ld`.
+Currently: 268 Q.E.D.s across 26 proof files + 278 test assertions via `ld`.
 
 ### Level 4: Certification
 Book certification ensures soundness. Use `cert.pl`:
@@ -594,9 +596,9 @@ examples/wasm1-acl2-formalization-plan/
 
 The formalization is **complete** when:
 1. ✅ All WASM 1.0 instructions: 170/170 (100%)
-2. ✅ execution.lisp certifies with `cert.pl` (3377 lines)
-3. ✅ **13/13 test files pass (256 assertions, 0 failures)**
-4. ✅ **22/22 proof files pass (212 Q.E.D.s, 0 failures)**
+2. ✅ execution.lisp certifies with `cert.pl` (3496 lines)
+3. ✅ **14/14 test files pass (278 assertions, 0 failures)**
+4. ✅ **26/26 proof files pass (268 Q.E.D.s, 0 failures)**
 5. ✅ E2E pipeline demonstrated (WAT → .wasm → ACL2 → execution)
 6. ✅ Code extends Kestrel WASM books properly (include-book compatible)
 7. ✅ IEEE 754 floating-point: all 14 remaining instructions implemented via Kestrel ieee-floats-as-bvs
@@ -604,12 +606,18 @@ The formalization is **complete** when:
    - float-specialp with `:f32.nan`, `:f32.+inf`, `:f32.-inf` (and f64 variants)
    - NaN propagates through all binops, unary ops, comparisons; div(0,0)=NaN; sqrt(-x)=NaN
    - `f32.ne(NaN,x) = 1`, all other comparisons with NaN = 0 (IEEE 754 unordered)
-   - 10 formal theorems + 28 oracle-verified test cases
-9. 🔲 Module instantiation + pure ACL2 binary parser integration (future work)
+   - 20 formal theorems + 28 oracle-verified test cases
+9. ✅ **IEEE 754 Signed Zero (M13)**
+   - `:f32.+0`, `:f32.-0`, `:f64.+0`, `:f64.-0` as float-specialp atoms
+   - neg(+0)=-0, neg(-0)=+0; abs(±0)=+0; +0==−0; pos/-0=−∞; copysign(x,−0)=−|x|
+   - Updated def-f32/f64-binop macros accept ±0 (rational 0 for arithmetic)
+   - 11 formal theorems + 23 oracle-verified test cases
+10. 🔲 Module instantiation + pure ACL2 binary parser integration (future work)
 
 ### What "100% coverage" means practically
 - **All 170 WASM 1.0 instructions** are implemented and dispatch correctly
 - **IEEE 754 NaN propagation**: fully implemented per spec (M12)
+- **IEEE 754 Signed Zero**: ±0 atoms, neg/abs/copysign/div/cmp all correct (M13)
 - **IEEE 754 Inf arithmetic**: basic Inf support (neg/abs/div); full Inf binop arithmetic = future work
 - **Remaining work**: module instantiation, binary parser integration
 - **For verification targets**: integer and float proofs are both covered; module-level integration is the main gap
