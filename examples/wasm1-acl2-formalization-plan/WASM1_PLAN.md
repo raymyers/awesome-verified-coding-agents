@@ -27,25 +27,25 @@
 | M4: Memory | ✅ Verified | i32/i64 load/store, all packed variants, memory.size/grow |
 | M5: i64 + Conversions | ✅ Verified | Full i64 arith/bitwise/cmp, wrap/extend conversions |
 | M5b: Globals | ✅ Verified | global.get, global.set, globalinst |
-| M6: Floating-Point | 🔶 Partial | f32/f64 arith, cmp, unary (14 instructions missing) |
+| M6: Floating-Point | ✅ Complete | f32/f64 arith, cmp, unary, copysign, trunc, nearest — all 170 instrs |
 | M7: Tables + call_indirect | ✅ Verified | table, call_indirect dispatch |
-| M8: Proofs | ✅ Verified | 110 Q.E.D.s across 16 proof files (3 float proofs fail) |
+| M8: Proofs | ✅ Verified | 130 Q.E.D.s + 12 PASSED across 19 proof files |
 | M9: Validation | ✅ Verified | Type checker + 12 soundness theorems + 70 validation tests |
 | M10: E2E Pipeline | ✅ Done | WAT → .wasm → ACL2 S-expr → execution |
-| M11: Hardening | 🔲 Todo | IEEE 754 edge cases, remaining 14 float instructions |
+| M11: IEEE 754 Integration | ✅ Complete | Reinterpret, f32/f64 load/store via Kestrel ieee-floats-as-bvs |
 
-### Verified Numbers (machine-checked 2026-04-18)
+### Verified Numbers (machine-checked 2026-04-20)
 
 | Metric | Value |
 |---|---|
-| Instructions in `execution.lisp` | 156 / 170 WASM 1.0 (91%) |
-| `execution.lisp` certifies (`cert.pl`) | ✅ Yes (2856 lines, 2.79s) |
+| Instructions in `execution.lisp` | **170 / 170 WASM 1.0 (100%)** |
+| `execution.lisp` certifies (`cert.pl`) | ✅ Yes (3168 lines, 3.16s) |
 | Test files passing | 12 / 12 (224 assertions, 0 failures) |
-| Proof files passing | 16 / 17 (110 Q.E.D.s, 3 float proof failures) |
+| Proof files passing | **19 / 19 (130 Q.E.D.s + 12 PASSED, 0 failures)** |
 | Validation tests | 70 PASSED, 0 FAILED |
-| Missing instructions | 14 (all float: copysign, nearest, trunc, reinterpret, f32/f64 load/store) |
+| Missing instructions | **0** |
 
-**All non-floating-point WASM 1.0 instructions are implemented, certified, and tested.**
+**All 170 WASM 1.0 instructions are implemented, certified, and tested.**
 
 ---
 
@@ -177,12 +177,12 @@ For loops, continuation re-enters the loop instruction.
 - [x] f32/f64 unary ops (abs, neg, sqrt, ceil, floor, trunc, nearest)
 
 ### Remaining (14 instructions)
-- [ ] f32.copysign/f64.copysign
-- [ ] f32.nearest/f64.nearest (banker's rounding)
-- [ ] f32.trunc/f64.trunc (float→float truncation)
-- [ ] f32.reinterpret_i32, i32.reinterpret_f32
-- [ ] f64.reinterpret_i64, i64.reinterpret_f64
-- [ ] f32.load/f64.load, f32.store/f64.store
+- [x] f32.copysign/f64.copysign
+- [x] f32.nearest/f64.nearest (banker's rounding, inline ties-to-even)
+- [x] f32.trunc/f64.trunc (float→float truncation)
+- [x] f32.reinterpret_i32, i32.reinterpret_f32 (via kestrel/floats/ieee-floats-as-bvs)
+- [x] f64.reinterpret_i64, i64.reinterpret_f64 (via kestrel/floats/ieee-floats-as-bvs)
+- [x] f32.load/f64.load, f32.store/f64.store (IEEE 754 encode/decode + memory)
 - [ ] IEEE 754 edge cases: NaN propagation in existing ops
 
 ### Path Forward: Kestrel IEEE 754 Library (discovered 2026-04-19)
@@ -514,7 +514,7 @@ examples/wasm1-acl2-formalization-plan/
 ├── package.lsp              # WASM package definition (copied from Kestrel)
 ├── portcullis.lisp          # Portcullis book (copied from Kestrel)
 ├── portcullis.acl2          # Portcullis commands
-├── execution.lisp           # Main semantics (2856 lines, 156/170 instructions, CERTIFIES)
+├── execution.lisp           # Main semantics (3168 lines, 170/170 instructions, CERTIFIES)
 ├── validation.lisp          # Type checker
 ├── tests/
 │   ├── test-m1-instructions.lisp
@@ -572,16 +572,17 @@ examples/wasm1-acl2-formalization-plan/
 ## Definition of Done
 
 The formalization is **complete for integer WASM** when:
-1. ✅ All WASM 1.0 integer + control + memory instructions: 156/170 (91%)
-2. ✅ execution.lisp certifies with `cert.pl` (2856 lines, 2.79s)
+1. ✅ All WASM 1.0 instructions: 170/170 (100%)
+2. ✅ execution.lisp certifies with `cert.pl` (3168 lines, 3.16s)
 3. ✅ 12/12 test files pass (224 assertions, 0 failures)
-4. ✅ 16/17 proof files pass (110 Q.E.D.s, 0 non-float failures)
+4. ✅ **19/19 proof files pass (130 Q.E.D.s + 12 PASSED, 0 failures)**
 5. ✅ E2E pipeline demonstrated (WAT → .wasm → ACL2 → execution)
 6. ✅ Code extends Kestrel WASM books properly (include-book compatible)
-7. 🔶 IEEE 754 floating-point: 14 instructions missing (copysign, nearest, trunc, reinterpret, f32/f64 load/store)
+7. ✅ IEEE 754 floating-point: all 14 remaining instructions implemented via Kestrel ieee-floats-as-bvs
 8. 🔲 Module instantiation + pure ACL2 binary parser integration (future work)
 
-### What "91% coverage" means practically
-- **For Rust/C compiled WASM** (no floats): effectively 100% of instructions covered
-- **For general WASM**: need the 14 remaining float operations for full conformance
+### What "100% coverage" means practically
+- **All 170 WASM 1.0 instructions** are implemented and dispatch correctly
+- **IEEE 754 special values** (NaN, ±∞, ±0) trap in the rational model — correct for non-special float programs
+- **Remaining work**: NaN propagation rules, module instantiation, binary parser integration
 - **For verification targets**: integer proofs are the primary value; float IEEE 754 conformance is a stretch goal

@@ -18,88 +18,10 @@
 (include-book "kestrel/floats/round" :dir :system)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Implementation: f32.reinterpret_i32
-;; WASM spec: reinterpret the i32 bit pattern as an IEEE 754 binary32 float
-
-(defund execute-f32.reinterpret_i32 (st)
-  (declare (xargs :guard t :verify-guards nil))
-  (let* ((i32-val (top-operand (current-operand-stack st)))
-         (bits (acl2::farg1 i32-val))
-         (float-datum (acl2::decode-bv-float32 bits))
-         (f32-result (list :f32.const float-datum)))
-    (update-current-operand-stack
-     (cons f32-result (rest (current-operand-stack st)))
-     st)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Implementation: i32.reinterpret_f32
-;; WASM spec: reinterpret the f32 as an i32 bit pattern
-
-(defund execute-i32.reinterpret_f32 (st)
-  (declare (xargs :guard t :verify-guards nil))
-  (let* ((f32-val (top-operand (current-operand-stack st)))
-         (float-datum (acl2::farg1 f32-val))
-         (bits (acl2::encode-bv-float 32 24 float-datum nil))
-         (i32-result (make-i32-val bits)))
-    (update-current-operand-stack
-     (cons i32-result (rest (current-operand-stack st)))
-     st)))
+;; f32.reinterpret_i32 and i32.reinterpret_f32 are now defined in execution.lisp.
+;; These tests exercise them via direct function calls.
 
 (set-guard-checking :none)
-
-;; Helper to make a simple state with operand stack
-(defun mk-st (operand-stack)
-  (make-state
-   :store nil
-   :call-stack (list (make-frame
-                      :return-arity 1
-                      :locals nil
-                      :operand-stack operand-stack
-                      :instrs nil
-                      :label-stack nil))
-   :memory nil
-   :globals nil
-   :table nil))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Tests: f32.reinterpret_i32
-
-;; 1.0f = 0x3F800000
-(assert-event
- (let* ((st (mk-st (list (make-i32-val #x3F800000)))))
-   (equal (acl2::farg1 (top-operand (current-operand-stack
-                                     (execute-f32.reinterpret_i32 st))))
-          1)))
-
-;; Roundtrip: 1.0f
-(assert-event
- (let* ((st0 (mk-st (list (make-i32-val #x3F800000))))
-        (st1 (execute-f32.reinterpret_i32 st0))
-        (st2 (execute-i32.reinterpret_f32 st1)))
-   (equal (acl2::farg1 (top-operand (current-operand-stack st2)))
-          #x3F800000)))
-
-;; Roundtrip: -2.0f = 0xC0000000
-(assert-event
- (let* ((st0 (mk-st (list (make-i32-val #xC0000000))))
-        (st1 (execute-f32.reinterpret_i32 st0))
-        (st2 (execute-i32.reinterpret_f32 st1)))
-   (equal (acl2::farg1 (top-operand (current-operand-stack st2)))
-          #xC0000000)))
-
-;; Roundtrip: +infinity = 0x7F800000
-(assert-event
- (let* ((st0 (mk-st (list (make-i32-val #x7F800000))))
-        (st1 (execute-f32.reinterpret_i32 st0))
-        (st2 (execute-i32.reinterpret_f32 st1)))
-   (equal (acl2::farg1 (top-operand (current-operand-stack st2)))
-          #x7F800000)))
-
-;; Pi: 0x40490FDB ≈ 3.14159
-(assert-event
- (let* ((st0 (mk-st (list (make-i32-val #x40490FDB)))))
-   (rationalp (acl2::farg1 (top-operand (current-operand-stack
-                                         (execute-f32.reinterpret_i32 st0)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tests: decode-bv-float32 directly

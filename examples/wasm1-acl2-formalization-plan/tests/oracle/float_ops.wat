@@ -64,4 +64,53 @@
   ;; i32.trunc_f64_u
   (func (export "i32_trunc_f64_u") (param f64) (result i32)
     local.get 0 i32.trunc_f64_u)
+
+  ;; --- M11: New float instructions ---
+
+  ;; f32.trunc
+  (func (export "f32_trunc") (param f32) (result f32)
+    local.get 0 f32.trunc)
+
+  ;; f32.nearest
+  (func (export "f32_nearest") (param f32) (result f32)
+    local.get 0 f32.nearest)
+
+  ;; f32.copysign
+  (func (export "f32_copysign") (param f32 f32) (result f32)
+    local.get 0 local.get 1 f32.copysign)
+
+  ;; f64.trunc
+  (func (export "f64_trunc") (param f64) (result f64)
+    local.get 0 f64.trunc)
+
+  ;; f64.nearest
+  (func (export "f64_nearest") (param f64) (result f64)
+    local.get 0 f64.nearest)
+
+  ;; f64.copysign
+  (func (export "f64_copysign") (param f64 f64) (result f64)
+    local.get 0 local.get 1 f64.copysign)
+
+  ;; f32.reinterpret_i32
+  (func (export "f32_reinterpret_i32") (param i32) (result f32)
+    local.get 0 f32.reinterpret_i32)
+
+  ;; i32.reinterpret_f32
+  (func (export "i32_reinterpret_f32") (param f32) (result i32)
+    local.get 0 i32.reinterpret_f32)
+
+  ;; reinterpret roundtrip i32→f32→i32
+  (func (export "reinterpret_roundtrip") (param i32) (result i32)
+    local.get 0 f32.reinterpret_i32 i32.reinterpret_f32)
+
+  ;; f32 load/store (needs memory)
+  (memory (export "mem") 1)
+
+  (func (export "f32_store_load") (param f32) (result f32)
+    (f32.store (i32.const 0) (local.get 0))
+    (f32.load (i32.const 0)))
+
+  (func (export "f64_store_load") (param f64) (result f64)
+    (f64.store (i32.const 0) (local.get 0))
+    (f64.load (i32.const 0)))
 )

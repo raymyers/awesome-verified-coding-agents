@@ -20,10 +20,12 @@
     make-f64-val make-f32-val
     f64-const-argsp f32-const-argsp
     make-i32-val i32-valp i32-const-argsp no-argsp
+    f64-valp f32-valp
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp i64-valp u32p u64p))
+    valp i64-valp u32p u64p
+    step))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: f64.add instruction specification
