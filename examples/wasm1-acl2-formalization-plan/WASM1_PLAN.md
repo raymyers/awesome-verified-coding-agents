@@ -29,7 +29,7 @@
 | M5b: Globals | ✅ Verified | global.get, global.set, globalinst |
 | M6: Floating-Point | ✅ Complete | f32/f64 arith, cmp, unary, copysign, trunc, nearest — all 170 instrs |
 | M7: Tables + call_indirect | ✅ Verified | table, call_indirect dispatch |
-| M8: Proofs | ✅ Verified | 130 Q.E.D.s + 12 PASSED across 19 proof files |
+| M8: Proofs | ✅ Verified | 165 Q.E.D.s + 12 PASSED across 20 proof files |
 | M9: Validation | ✅ Verified | Type checker + 12 soundness theorems + 70 validation tests |
 | M10: E2E Pipeline | ✅ Done | WAT → .wasm → ACL2 S-expr → execution |
 | M11: IEEE 754 Integration | ✅ Complete | Reinterpret, f32/f64 load/store via Kestrel ieee-floats-as-bvs |
@@ -41,7 +41,7 @@
 | Instructions in `execution.lisp` | **170 / 170 WASM 1.0 (100%)** |
 | `execution.lisp` certifies (`cert.pl`) | ✅ Yes (3168 lines, 3.16s) |
 | Test files passing | 12 / 12 (224 assertions, 0 failures) |
-| Proof files passing | **19 / 19 (130 Q.E.D.s + 12 PASSED, 0 failures)** |
+| Proof files passing | **20 / 20 (165 Q.E.D.s + 12 PASSED = 177, 0 failures)** |
 | Validation tests | 70 PASSED, 0 FAILED |
 | Missing instructions | **0** |
 
@@ -305,7 +305,7 @@ WAT source → wat2wasm → .wasm binary → wasm2acl2.js → ACL2 S-exprs → A
 
 ---
 
-## Milestone 11: Hardening & Spec Conformance 🔲 Todo
+## Milestone 11: Hardening & Spec Conformance 🔶 In Progress
 
 **Goal**: Close gaps between implementation and WASM 1.0 spec.
 
@@ -316,19 +316,36 @@ WAT source → wat2wasm → .wasm binary → wasm2acl2.js → ACL2 S-exprs → A
 - [ ] Integration with parse-binary.lisp for full .wasm → execution
 
 ### 11.2 IEEE 754 Floating-Point Completeness
+- [x] Reinterpret ops via `kestrel/floats/ieee-floats-as-bvs` (M11)
+- [x] Float load/store with IEEE 754 encode/decode (M11)
+- [x] copysign, trunc, nearest (M11)
 - [ ] Explicit NaN/Infinity representation (not ACL2 rationals)
 - [ ] NaN propagation rules
 - [ ] Signed zero handling
-- [ ] All conversion ops (trunc, convert, demote, promote, reinterpret)
 
-### 11.3 Edge Cases & Traps
-- [ ] i32.div_s overflow: `(-2^31) / (-1)` → trap
+### 11.3 Edge Cases & Traps ✅ Done (2026-04-20)
+- [x] i32.div_s overflow: `(-2^31) / (-1)` → trap (proved)
+- [x] i32.div_s(x, 0) → trap for ALL x (symbolic proof)
+- [x] i32.div_u(x, 0) → trap for ALL x (symbolic proof)
+- [x] i32.rem_s(x, 0) → trap for ALL x (symbolic proof)
+- [x] i32.rem_u(x, 0) → trap for ALL x (symbolic proof)
+- [x] i32.rem_s(MIN, -1) = 0 (NOT a trap — notorious edge case)
+- [x] Signed division truncates toward zero: div_s(-7, 2) = -3
+- [x] Signed remainder: sign follows dividend: rem_s(-7, 2) = -1
+- [x] Shift modular semantics: shl(1, 32) = 1 (amount mod 32)
+- [x] Arithmetic shift right sign-extends: shr_s(MIN, 1) = -2^30 unsigned
+- [x] Rotation boundary: rotl(0xFF000000, 4) = 0xF000000F
+- [x] Bit counting boundaries: clz(0)=32, ctz(0)=32, popcnt(MAX)=32
+- [x] Signed comparison: lt_s(MIN_INT, 0) = 1
+- [x] Conversion: wrap(2^32+1) = 1, extend_s(-1) = -1 as u64
 - [ ] Memory alignment checks (optional per spec)
 - [ ] Table element type checking in call_indirect
 - [ ] Recursive function call depth limits
 
-### 11.4 Spec Conformance Testing
-- [ ] Port relevant tests from WASM spec test suite (`test/core/`)
+### 11.4 Spec Conformance Testing 🔶 Partial
+- [x] 35 oracle-backed edge case theorems (proof-spec-edge-cases.lisp)
+- [x] 4 universal symbolic trap proofs (∀x. div/rem by zero traps)
+- [ ] Port remaining tests from WASM spec test suite (`test/core/`)
 - [ ] Test all branch instruction edge cases
 - [ ] Test all numeric edge cases (overflow, underflow, NaN)
 
@@ -373,7 +390,7 @@ ACL2 just computes the answer and checks equality.
 ```
 
 **Coverage**: Every instruction gets at least 2 tests (normal case + edge case/trap).
-Currently: 29 test/proof files, ~50+ individual assert-events.
+Currently: 32 test/proof files, ~50+ individual assert-events.
 
 ### Level 2: Oracle Testing (E2E Pipeline)
 WAT source code compiled with `wat2wasm`, executed with Node.js WASM runtime
@@ -401,7 +418,7 @@ Universal properties proven by ACL2's theorem prover.
   :hints (("Goal" :in-theory (enable ...))))
 ```
 
-Currently: 110 Q.E.D.s across 16 proof files + 224 test assertions via `ld`.
+Currently: 165 Q.E.D.s across 20 proof files + 224 test assertions via `ld`.
 
 ### Level 4: Certification
 Book certification ensures soundness. Use `cert.pl`:
@@ -539,8 +556,10 @@ examples/wasm1-acl2-formalization-plan/
 │   ├── proof-mem-roundtrip.lisp
 │   ├── proof-bitwise.lisp
 │   ├── proof-validation-soundness.lisp
-│   ├── proof-e2e-pipeline.lisp
-│   └── ... (14 total)
+│   ├── proof-spec-edge-cases.lisp   # 35 Q.E.D.s: trap, shift, rotate, clz/ctz/popcnt, conversions
+│   ├── proof-m11-float-ops.lisp     # 14 Q.E.D.s: trunc, nearest, copysign (f32+f64)
+│   ├── proof-ieee754-integration.lisp
+│   └── ... (20 total)
 ├── e2e/
 │   ├── wasm2acl2.js         # WASM binary → ACL2 translator
 │   ├── add.wat / add.wasm / add.json
@@ -560,7 +579,7 @@ examples/wasm1-acl2-formalization-plan/
 |---|---|---|---|---|
 | Guard verification complexity | High | Medium | Incremental; prove type theorems early | ✅ Managed |
 | Block/label model mismatch | Medium | High | Prototyped with tests first | ✅ Resolved |
-| Floating-point IEEE 754 | High | Medium | Deferred; integer-only MVP first | 🔶 Partial |
+| Floating-point IEEE 754 | High | Medium | Deferred; integer-only MVP first; now 14 ops done | ✅ Managed |
 | ACL2 build time | Medium | Low | cert.pl for single books; ~3min full build | ✅ Acceptable |
 | Parser-executor mismatch | Low | Medium | E2E pipeline catches mismatches | ✅ Resolved |
 | Termination proofs | Medium | Medium | Step-count bounded `run` | ✅ Resolved |
@@ -575,7 +594,7 @@ The formalization is **complete for integer WASM** when:
 1. ✅ All WASM 1.0 instructions: 170/170 (100%)
 2. ✅ execution.lisp certifies with `cert.pl` (3168 lines, 3.16s)
 3. ✅ 12/12 test files pass (224 assertions, 0 failures)
-4. ✅ **19/19 proof files pass (130 Q.E.D.s + 12 PASSED, 0 failures)**
+4. ✅ **20/20 proof files pass (165 Q.E.D.s + 12 PASSED = 177, 0 failures)**
 5. ✅ E2E pipeline demonstrated (WAT → .wasm → ACL2 → execution)
 6. ✅ Code extends Kestrel WASM books properly (include-book compatible)
 7. ✅ IEEE 754 floating-point: all 14 remaining instructions implemented via Kestrel ieee-floats-as-bvs
