@@ -9,7 +9,7 @@
 (ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
 (include-book "kestrel/wasm/execution" :dir :system)
-(ld "/workspace/project/examples/wasm1-acl2-formalization-plan/validation.lisp")
+(ld "/workspace/project/awesome-verified-coding-agents/examples/wasm1-acl2-formalization-plan/validation.lisp")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: The type checker correctly types i32 addition

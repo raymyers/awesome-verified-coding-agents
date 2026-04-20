@@ -6,13 +6,12 @@ Repo: `raymyers/awesome-verified-coding-agents` branch `add-wasm1-acl2-formaliza
 Subdir: `examples/wasm1-acl2-formalization-plan/`
 
 ## Current Status (2026-04-20)
-- **170/170 WASM 1.0 instructions** implemented, certified, tested
-- **21 proof files, 204 proved/passed, 0 failures** (192 Q.E.D.s + 12 PASSED)
-- **execution.lisp**: 3168 lines, certifies with cert.pl
-- **ACL2_SEMANTICS_REF.md**: 1230+ lines, 19 sections including proof techniques catalog
-- **New**: proof-spec-edge-cases.lisp (35 Q.E.D.s: traps, shifts, rotations, conversions)
-- **New**: proof-algebraic-properties.lisp (27 Q.E.D.s: identity, annihilator, reflexivity)
-- **Critical gotchas documented**: 19 sections in ACL2_SEMANTICS_REF.md
+- **170/170 WASM 1.0 instructions** implemented, certified, tested (3377 lines)
+- **22 proof files, 212 Q.E.D.s, 0 failures**
+- **13/13 test files pass**, 256 assertions, 0 failures
+- **M12**: IEEE 754 NaN/Inf propagation — float-specialp, 10 formal theorems, 28 oracle tests
+- **Also**: proof-spec-edge-cases.lisp (35 Q.E.D.s), proof-algebraic-properties.lisp (27 Q.E.D.s)
+- **Critical gotchas + NaN design**: ACL2_SEMANTICS_REF.md §17-18
 
 ## Key Files
 - `WASM1_PLAN.md` — Milestone plan with task bullets, MVP strategy, testing plan
@@ -106,10 +105,12 @@ ALWAYS derive expected values from `wat2wasm` + Node.js FIRST, then encode in AC
 Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 
 ## Verified State (2026-04-20)
-- **170/170** WASM 1.0 instructions (100%), `execution.lisp` CERTIFIES (3168 lines)
-- **12/12** test files pass (224 assertions, 0 failures)
-- **21/21** proof files pass (192 Q.E.D.s + 12 PASSED = 204, 0 failures)
-- **All WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, f32, f64, memory, conversions, tables
+- **170/170** WASM 1.0 instructions (100%), `execution.lisp` CERTIFIES (3377 lines)
+- **13/13** test files pass (256 assertions, 0 failures)
+- **22/22** proof files pass (212 Q.E.D.s, 0 failures)
+- **All WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, memory, f32/f64, conversions, reinterpret
+- **M12 complete**: IEEE 754 NaN propagation (float-specialp pattern), 0/0=NaN, x/0=±Inf, sqrt(-x)=NaN
+- **Missing**: module instantiation, binary parser integration (future work)
 
 ## Kestrel IEEE 754 Library (discovered 2026-04-19)
 `books/kestrel/floats/ieee-floats-as-bvs` provides exact IEEE 754 encode/decode:
@@ -128,7 +129,7 @@ Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 - **Never put macros in enable**: `farg1` is a macro → cryptic theory evaluation error
 
 ## What's Next
-- Module instantiation (M11.1)
-- NaN/signed zero IEEE 754 model (M11.2)
-- Guard verification on key functions (M11.5)
-- More spec test edge cases for i64 (M11.4)
+- Module instantiation + binary parser integration (connect parse-binary.lisp to execution)
+- Guard verification (currently deferred with `:verify-guards nil`)
+- Full Inf arithmetic (Inf+Inf, Inf-Inf, etc. — currently traps for Inf binop operands)
+- Signed zero (±0 distinction) — currently treated as 0

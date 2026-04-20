@@ -126,12 +126,49 @@
        (= 1 (len (acl2::fargs val)))
        (rationalp (acl2::farg1 val))))
 
+;; IEEE 754 special float values on the operand stack.
+;; NaN and ±Infinity are represented as bare keywords (not (:f32.const ...) lists)
+;; so that f32-valp/f64-valp remain restricted to finite rationals and all
+;; existing theorems are unaffected.
+;;   f32: :f32.nan, :f32.+inf, :f32.-inf
+;;   f64: :f64.nan, :f64.+inf, :f64.-inf
+(defund float-specialp (v)
+  (declare (xargs :guard t))
+  (or (eq v :f32.nan) (eq v :f32.+inf) (eq v :f32.-inf)
+      (eq v :f64.nan) (eq v :f64.+inf) (eq v :f64.-inf)))
+
 (defund valp (val)
   (declare (xargs :guard t))
   (or (i32-valp val)
       (i64-valp val)
       (f32-valp val)
-      (f64-valp val)))
+      (f64-valp val)
+      (float-specialp val))) ; NaN and ±Inf are valid stack values
+
+;; Derived theorems for float-special values
+(defthm valp-of-f32-nan
+  (valp :f32.nan)
+  :hints (("Goal" :in-theory (enable valp float-specialp))))
+
+(defthm valp-of-f32-+inf
+  (valp :f32.+inf)
+  :hints (("Goal" :in-theory (enable valp float-specialp))))
+
+(defthm valp-of-f32--inf
+  (valp :f32.-inf)
+  :hints (("Goal" :in-theory (enable valp float-specialp))))
+
+(defthm valp-of-f64-nan
+  (valp :f64.nan)
+  :hints (("Goal" :in-theory (enable valp float-specialp))))
+
+(defthm valp-of-f64-+inf
+  (valp :f64.+inf)
+  :hints (("Goal" :in-theory (enable valp float-specialp))))
+
+(defthm valp-of-f64--inf
+  (valp :f64.-inf)
+  :hints (("Goal" :in-theory (enable valp float-specialp))))
 
 (defun val-listp (vals)
   (declare (xargs :guard t))
@@ -2126,7 +2163,8 @@
        (state (update-current-operand-stack ostack state)))
     (advance-instrs state)))
 
-;; Macro: f32 binary arithmetic op
+;; Macro: f32 binary arithmetic op (with IEEE 754 NaN propagation)
+;; If either operand is NaN the result is NaN; Inf operands trap for now.
 (defmacro def-f32-binop (name expr)
   `(defun ,name (state)
      (declare (xargs :guard (statep state) :verify-guards nil))
@@ -2134,6 +2172,11 @@
           ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
           (arg2 (top-operand ostack))
           (arg1 (top-operand (pop-operand ostack)))
+          ;; IEEE 754: any NaN operand → NaN result
+          ((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
+           (let* ((ostack (push-operand :f32.nan (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
           ((when (not (and (f32-valp arg1) (f32-valp arg2)))) :trap)
           (v1 (farg1 arg1))
           (v2 (farg1 arg2))
@@ -2142,7 +2185,7 @@
           (state (update-current-operand-stack ostack state)))
        (advance-instrs state))))
 
-;; Macro: f64 binary arithmetic op
+;; Macro: f64 binary arithmetic op (with IEEE 754 NaN propagation)
 (defmacro def-f64-binop (name expr)
   `(defun ,name (state)
      (declare (xargs :guard (statep state) :verify-guards nil))
@@ -2150,6 +2193,11 @@
           ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
           (arg2 (top-operand ostack))
           (arg1 (top-operand (pop-operand ostack)))
+          ;; IEEE 754: any NaN operand → NaN result
+          ((when (or (eq arg1 :f64.nan) (eq arg2 :f64.nan)))
+           (let* ((ostack (push-operand :f64.nan (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
           ((when (not (and (f64-valp arg1) (f64-valp arg2)))) :trap)
           (v1 (farg1 arg1))
           (v2 (farg1 arg2))
@@ -2159,13 +2207,22 @@
        (advance-instrs state))))
 
 ;; Macro: f32 comparison (returns i32 0 or 1)
-(defmacro def-f32-cmpop (name expr)
+;; IEEE 754: NaN comparisons return nan-result (0 for ordered comparisons,
+;; 1 for ne — because NaN is "unordered" and ne is defined as not-equal).
+(defmacro def-f32-cmpop (name expr &key (nan-result '0))
   `(defun ,name (state)
      (declare (xargs :guard (statep state) :verify-guards nil))
      (b* ((ostack (current-operand-stack state))
           ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
           (arg2 (top-operand ostack))
           (arg1 (top-operand (pop-operand ostack)))
+          ;; IEEE 754: NaN is unordered; all ordered comparisons return false (0),
+          ;; except ne which returns true (1) when either operand is NaN.
+          ((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
+           (let* ((ostack (push-operand (make-i32-val ,nan-result)
+                                        (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
           ((when (not (and (f32-valp arg1) (f32-valp arg2)))) :trap)
           (v1 (farg1 arg1))
           (v2 (farg1 arg2))
@@ -2175,13 +2232,19 @@
        (advance-instrs state))))
 
 ;; Macro: f64 comparison (returns i32 0 or 1)
-(defmacro def-f64-cmpop (name expr)
+(defmacro def-f64-cmpop (name expr &key (nan-result '0))
   `(defun ,name (state)
      (declare (xargs :guard (statep state) :verify-guards nil))
      (b* ((ostack (current-operand-stack state))
           ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
           (arg2 (top-operand ostack))
           (arg1 (top-operand (pop-operand ostack)))
+          ;; IEEE 754: NaN is unordered
+          ((when (or (eq arg1 :f64.nan) (eq arg2 :f64.nan)))
+           (let* ((ostack (push-operand (make-i32-val ,nan-result)
+                                        (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
           ((when (not (and (f64-valp arg1) (f64-valp arg2)))) :trap)
           (v1 (farg1 arg1))
           (v2 (farg1 arg2))
@@ -2201,10 +2264,21 @@
        ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
        (arg2 (top-operand ostack))
        (arg1 (top-operand (pop-operand ostack)))
+       ;; IEEE 754: NaN propagates
+       ((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
+        (let* ((ostack (push-operand :f32.nan (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (and (f32-valp arg1) (f32-valp arg2)))) :trap)
        (v1 (farg1 arg1))
        (v2 (farg1 arg2))
-       ((when (= v2 0)) :trap)
+       ;; IEEE 754: x/0 semantics — 0/0=NaN, pos/0=+Inf, neg/0=-Inf
+       ((when (= v2 0))
+        (let* ((special (if (= v1 0) :f32.nan
+                          (if (> v1 0) :f32.+inf :f32.-inf)))
+               (ostack (push-operand special (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        (result (make-f32-val (/ v1 v2)))
        (ostack (push-operand result (pop-operand (pop-operand ostack))))
        (state (update-current-operand-stack ostack state)))
@@ -2219,6 +2293,19 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: neg(NaN)=NaN, neg(+Inf)=-Inf, neg(-Inf)=+Inf
+       ((when (eq arg :f32.nan))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (eq arg :f32.+inf))
+        (let* ((ostack (push-operand :f32.-inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (eq arg :f32.-inf))
+        (let* ((ostack (push-operand :f32.+inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f32-valp arg))) :trap)
        (result (make-f32-val (- (farg1 arg))))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2230,6 +2317,15 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: abs(NaN)=NaN, abs(±Inf)=+Inf
+       ((when (eq arg :f32.nan))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (or (eq arg :f32.+inf) (eq arg :f32.-inf)))
+        (let* ((ostack (push-operand :f32.+inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f32-valp arg))) :trap)
        (result (make-f32-val (abs (farg1 arg))))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2241,11 +2337,24 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: sqrt(NaN)=NaN, sqrt(+Inf)=+Inf, sqrt(-Inf)=NaN
+       ((when (eq arg :f32.nan))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (eq arg :f32.+inf))
+        (let* ((ostack (push-operand :f32.+inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f32-valp arg))) :trap)
        (v (farg1 arg))
-       ((when (< v 0)) :trap)
-       ;; Use integer-sqrt for non-negative integers; trap for non-integer rationals
-       ;; (exact sqrt is not expressible in ACL2 rationals for most inputs)
+       ;; sqrt of negative rational → NaN (per IEEE 754)
+       ((when (< v 0))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ;; Exact sqrt for perfect squares; trap for non-integer rationals
+       ;; (irrational results not representable in ACL2 rationals)
        ((when (not (integerp v))) :trap)
        (isq (if (= v 0) 0 (if (= v 1) 1 v)))
        (result (make-f32-val isq))
@@ -2258,6 +2367,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: ceil(NaN)=NaN; ±Inf traps (irrational ceiling)
+       ((when (eq arg :f32.nan))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f32-valp arg))) :trap)
        (result (make-f32-val (ceiling (farg1 arg) 1)))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2269,6 +2383,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: floor(NaN)=NaN
+       ((when (eq arg :f32.nan))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f32-valp arg))) :trap)
        (result (make-f32-val (floor (farg1 arg) 1)))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2281,6 +2400,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: trunc(NaN)=NaN
+       ((when (eq arg :f32.nan))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f32-valp arg))) :trap)
        (result (make-f32-val (truncate (farg1 arg) 1)))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2293,6 +2417,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: nearest(NaN)=NaN
+       ((when (eq arg :f32.nan))
+        (let* ((ostack (push-operand :f32.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f32-valp arg))) :trap)
        (v (farg1 arg))
        (int-part (truncate v 1))
@@ -2310,12 +2439,18 @@
     (advance-instrs state)))
 
 ;; f32.copysign: magnitude of first arg, sign of second arg
+;; IEEE 754: copysign(NaN, x) = NaN (magnitude is NaN regardless of sign arg)
 (defun execute-f32.copysign (state)
   (declare (xargs :guard (statep state) :verify-guards nil))
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
        (arg2 (top-operand ostack))
        (arg1 (top-operand (pop-operand ostack)))
+       ;; NaN propagation: if magnitude is NaN, result is NaN
+       ((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
+        (let* ((ostack (push-operand :f32.nan (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (and (f32-valp arg1) (f32-valp arg2)))) :trap)
        (mag (abs (farg1 arg1)))
        (sign-val (farg1 arg2))
@@ -2325,8 +2460,10 @@
     (advance-instrs state)))
 
 ;; f32 comparisons (return i32)
+;; IEEE 754: NaN is unordered — ordered comparisons (eq,lt,gt,le,ge) return 0;
+;; ne returns 1 because NaN is not equal to anything (including itself).
 (def-f32-cmpop execute-f32.eq (= v1 v2))
-(def-f32-cmpop execute-f32.ne (not (= v1 v2)))
+(def-f32-cmpop execute-f32.ne (not (= v1 v2)) :nan-result 1)
 (def-f32-cmpop execute-f32.lt (< v1 v2))
 (def-f32-cmpop execute-f32.gt (> v1 v2))
 (def-f32-cmpop execute-f32.le (<= v1 v2))
@@ -2343,10 +2480,21 @@
        ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
        (arg2 (top-operand ostack))
        (arg1 (top-operand (pop-operand ostack)))
+       ;; IEEE 754: NaN propagates
+       ((when (or (eq arg1 :f64.nan) (eq arg2 :f64.nan)))
+        (let* ((ostack (push-operand :f64.nan (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (and (f64-valp arg1) (f64-valp arg2)))) :trap)
        (v1 (farg1 arg1))
        (v2 (farg1 arg2))
-       ((when (= v2 0)) :trap)
+       ;; IEEE 754: x/0 semantics
+       ((when (= v2 0))
+        (let* ((special (if (= v1 0) :f64.nan
+                          (if (> v1 0) :f64.+inf :f64.-inf)))
+               (ostack (push-operand special (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        (result (make-f64-val (/ v1 v2)))
        (ostack (push-operand result (pop-operand (pop-operand ostack))))
        (state (update-current-operand-stack ostack state)))
@@ -2361,6 +2509,19 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: neg(NaN)=NaN, neg(+Inf)=-Inf, neg(-Inf)=+Inf
+       ((when (eq arg :f64.nan))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (eq arg :f64.+inf))
+        (let* ((ostack (push-operand :f64.-inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (eq arg :f64.-inf))
+        (let* ((ostack (push-operand :f64.+inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f64-valp arg))) :trap)
        (result (make-f64-val (- (farg1 arg))))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2372,6 +2533,15 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: abs(NaN)=NaN, abs(±Inf)=+Inf
+       ((when (eq arg :f64.nan))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (or (eq arg :f64.+inf) (eq arg :f64.-inf)))
+        (let* ((ostack (push-operand :f64.+inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f64-valp arg))) :trap)
        (result (make-f64-val (abs (farg1 arg))))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2383,9 +2553,22 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: sqrt(NaN)=NaN, sqrt(+Inf)=+Inf, sqrt(-Inf)=NaN
+       ((when (eq arg :f64.nan))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ((when (eq arg :f64.+inf))
+        (let* ((ostack (push-operand :f64.+inf (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f64-valp arg))) :trap)
        (v (farg1 arg))
-       ((when (< v 0)) :trap)
+       ;; sqrt of negative rational → NaN (per IEEE 754)
+       ((when (< v 0))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (integerp v))) :trap)
        (isq (if (= v 0) 0 (if (= v 1) 1 v)))
        (result (make-f64-val isq))
@@ -2398,6 +2581,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: ceil(NaN)=NaN
+       ((when (eq arg :f64.nan))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f64-valp arg))) :trap)
        (result (make-f64-val (ceiling (farg1 arg) 1)))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2409,6 +2597,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: floor(NaN)=NaN
+       ((when (eq arg :f64.nan))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f64-valp arg))) :trap)
        (result (make-f64-val (floor (farg1 arg) 1)))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2421,6 +2614,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: trunc(NaN)=NaN
+       ((when (eq arg :f64.nan))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f64-valp arg))) :trap)
        (result (make-f64-val (truncate (farg1 arg) 1)))
        (ostack (push-operand result (pop-operand ostack)))
@@ -2433,6 +2631,11 @@
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 1 (operand-stack-height ostack)))) :trap)
        (arg (top-operand ostack))
+       ;; IEEE 754: nearest(NaN)=NaN
+       ((when (eq arg :f64.nan))
+        (let* ((ostack (push-operand :f64.nan (pop-operand ostack)))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (f64-valp arg))) :trap)
        (v (farg1 arg))
        (int-part (truncate v 1))
@@ -2450,12 +2653,18 @@
     (advance-instrs state)))
 
 ;; f64.copysign: magnitude of first arg, sign of second arg
+;; IEEE 754: copysign(NaN, x) = NaN
 (defun execute-f64.copysign (state)
   (declare (xargs :guard (statep state) :verify-guards nil))
   (b* ((ostack (current-operand-stack state))
        ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
        (arg2 (top-operand ostack))
        (arg1 (top-operand (pop-operand ostack)))
+       ;; NaN propagation
+       ((when (or (eq arg1 :f64.nan) (eq arg2 :f64.nan)))
+        (let* ((ostack (push-operand :f64.nan (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (and (f64-valp arg1) (f64-valp arg2)))) :trap)
        (mag (abs (farg1 arg1)))
        (sign-val (farg1 arg2))
@@ -2464,9 +2673,9 @@
        (state (update-current-operand-stack ostack state)))
     (advance-instrs state)))
 
-;; f64 comparisons (return i32)
+;; f64 comparisons (return i32) — same IEEE 754 NaN semantics as f32
 (def-f64-cmpop execute-f64.eq (= v1 v2))
-(def-f64-cmpop execute-f64.ne (not (= v1 v2)))
+(def-f64-cmpop execute-f64.ne (not (= v1 v2)) :nan-result 1)
 (def-f64-cmpop execute-f64.lt (< v1 v2))
 (def-f64-cmpop execute-f64.gt (> v1 v2))
 (def-f64-cmpop execute-f64.le (<= v1 v2))

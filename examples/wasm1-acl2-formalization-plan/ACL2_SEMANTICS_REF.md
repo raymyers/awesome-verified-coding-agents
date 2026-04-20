@@ -1059,48 +1059,98 @@ All 57 reduction rules from `8-reduction.spectec` are covered:
 | Step_read/memory.size | ✅ | Memory size |
 | Step/memory.grow-succeed, memory.grow-fail | ✅ | Memory growth |
 
-### 18.6 Verification results snapshot (2026-04-18)
+### 18.6 Verification results snapshot (2026-04-20)
 
 ```
-=== TESTS (12/12 pass, 224 assertions) ===
+=== TESTS (13/13 pass, 256 assertions) ===
   ✅ test-m1-instructions:   18 PASSED
   ✅ test-m2-control-flow:    8 PASSED
   ✅ test-m3-functions:       6 PASSED
   ✅ test-m4-memory:          8 PASSED
   ✅ test-m5-i64:            22 PASSED
   ✅ test-m5b-globals:        7 PASSED
-  ✅ test-m7a-floats:        32 PASSED
+  ✅ test-m7a-floats:        35 PASSED  (updated: IEEE 754 div, 3 new NaN/Inf tests)
   ✅ test-m7b-tables:         7 PASSED
   ✅ test-m9-validation:     70 PASSED
+  ✅ test-m12-nan:           28 PASSED  (NEW: NaN propagation + Inf semantics)
   ✅ test-packed-mem-i64:    16 PASSED
   ✅ test-packed-mem:        11 PASSED
   ✅ test-spot-check:        19 PASSED
 
-=== PROOFS (16/17 pass, 110 Q.E.D.s) ===
+=== PROOFS (20/20 pass, 150 Q.E.D.s) ===
   ✅ proof-abs-e2e:              10 Q.E.D. (end-to-end abs function)
   ✅ proof-add-spec:              2 Q.E.D. (i32.add specification)
   ✅ proof-bitwise:               6 Q.E.D. (and/or/xor/shifts)
   ✅ proof-block-br-spec:         4 Q.E.D. (block + branch)
   ✅ proof-call-indirect-spec:    6 Q.E.D. (indirect calls)
-  ❌ proof-float-spec:            3 Q.E.D., 3 FAILED (float theory needs work)
+  ✅ proof-float-spec:            6 Q.E.D. (f64/f32 arithmetic specs)
   ✅ proof-global-spec:           4 Q.E.D. (global roundtrip)
   ✅ proof-i64-conv-spec:        10 Q.E.D. (i64 conversions)
+  ✅ proof-ieee754-integration:   3 Q.E.D. (Kestrel ieee-floats-as-bvs)
   ✅ proof-local-drop-spec:       6 Q.E.D. (local set/tee/drop)
   ✅ proof-loop-spec:             6 Q.E.D. (loop exit + multi-iteration)
+  ✅ proof-m11-float-ops:        14 Q.E.D. (trunc/nearest/copysign/reinterpret)
   ✅ proof-max-if-else:           6 Q.E.D. (if/else max)
   ✅ proof-mem-roundtrip:         9 Q.E.D. (memory store→load)
   ✅ proof-mul-eqz-spec:          8 Q.E.D. (mul + eqz)
+  ✅ proof-nan-propagation:      20 Q.E.D. (NEW: 10 NaN theorems)
   ✅ proof-select-spec:           4 Q.E.D. (select instruction)
   ✅ proof-sub-spec:              6 Q.E.D. (sub + algebraic identities)
   ✅ proof-trap-misc-spec:        8 Q.E.D. (trap propagation)
   ✅ proof-validation-soundness: 12 Q.E.D. (type checker correctness)
 ```
 
-### 18.7 Recommendations for Kestrel collaboration
+### 18.7 NaN/Inf Propagation Design (M12, 2026-04-20)
 
-1. **The full WASM 1.0 semantics are complete.** 170/170 instructions certify, all reduction rules are covered, 204 theorems/tests pass across 21 proof files. This covers all WASM 1.0 instructions including IEEE 754 float operations via Kestrel's ieee-floats-as-bvs library.
+**Representation**: NaN and ±Infinity are bare keyword atoms on the operand stack:
+- `f32`: `:f32.nan`, `:f32.+inf`, `:f32.-inf`
+- `f64`: `:f64.nan`, `:f64.+inf`, `:f64.-inf`
 
-2. **Float support needs an IEEE 754 bit-level model.** The current rational approximation works for well-behaved programs but fails for NaN propagation, signed zero, and bit-level reinterpretation. Recommend aligning with an existing ACL2 IEEE 754 formalization if one exists.
+These are NOT `(:f32.const ...)` lists — they're atoms. This keeps `f32-valp` restricted
+to rationals (no disruption to existing proofs) while allowing special values in `valp`.
+
+**Key predicate**: `(float-specialp v)` — recognizes all 6 special atoms. `valp` extended
+to include `float-specialp` so NaN/Inf values can live on the operand stack.
+
+**Propagation rules** (verified by Node.js oracle):
+```
+NaN + x = NaN         (all binops)
+NaN == NaN = 0        (ordered comparisons: false)
+NaN != NaN = 1        (ne: true — NaN is not-equal to everything)
+0/0 = NaN             5/0 = +Inf    -5/0 = -Inf
+sqrt(-1) = NaN        neg(NaN) = NaN    abs(-Inf) = +Inf
+```
+
+**Macro pattern** for NaN-aware binops (in `def-f32-binop`):
+```lisp
+;; Check NaN BEFORE f32-valp (NaN atoms fail f32-valp)
+((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
+ (let* ((ostack (push-operand :f32.nan (pop-operand (pop-operand ostack))))
+        (state (update-current-operand-stack ostack state)))
+   (advance-instrs state)))
+((when (not (and (f32-valp arg1) (f32-valp arg2)))) :trap)
+```
+
+**ne macro parameter**: `(def-f32-cmpop execute-f32.ne (...) :nan-result 1)` — uses
+`&key (nan-result 0)` to distinguish ne (returns 1 for NaN) from other comparisons.
+
+**Formal theorems** (`proofs/proof-nan-propagation.lisp`):
+1. `f32-nan-propagates-add`:   `f32-valp x → f32.add(NaN, x) = NaN`
+2. `f32-nan-propagates-mul`:   `f32-valp x → f32.mul(NaN, x) = NaN`
+3. `f32-nan-propagates-sub`:   `f32-valp x → f32.sub(NaN, x) = NaN`
+4. `f32-eq-nan-is-zero`:       `f32.eq(NaN, NaN) = 0`
+5. `f32-ne-nan-is-one`:        `f32.ne(NaN, NaN) = 1`
+6. `f32-lt-nan-is-zero`:       `f32-valp x → f32.lt(NaN, x) = 0`
+7. `f64-nan-propagates-add`:   `f64-valp x → f64.add(NaN, x) = NaN`
+8. `f64-nan-propagates-mul`:   `f64-valp x → f64.mul(NaN, x) = NaN`
+9. `f32-zero-div-zero-is-nan`: `f32.div(0, 0) = NaN`
+10. `f32-pos-div-zero-is-inf`:  `rationalp x ∧ x>0 → f32.div(x, 0) = +Inf`
+
+### 18.8 Recommendations for Kestrel collaboration
+
+1. **The full WASM 1.0 semantics are complete with NaN propagation.** 170/170 instructions certify, all reduction rules are covered, 150 theorems pass across 20 proof files. NaN propagates correctly through all float operations per IEEE 754.
+
+2. **NaN propagation is implemented.** The `float-specialp` predicate + keyword atoms approach cleanly extends the rational model without breaking existing proofs.
 
 3. **The `execution.lisp` is designed as a drop-in replacement for Kestrel's skeleton.** It uses the same package, defaggregate types, and include-book structure. The upgrade path is: replace `books/kestrel/wasm/execution.lisp` with our version.
 

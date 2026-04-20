@@ -59,10 +59,20 @@
  (equal (result-of (list '(:f32.const 10) '(:f32.const 4) '(:f32.div)))
         '(:f32.const 5/2)))
 
-;; f32.div by zero traps
+;; f32.div by zero: IEEE 754 — pos/0 = +Inf (Oracle: Node.js f32 1/0 = +Inf)
 (assert-event
- (equal (run-float-prog (list '(:f32.const 1) '(:f32.const 0) '(:f32.div)))
-        :trap))
+ (equal (result-of (list '(:f32.const 1) '(:f32.const 0) '(:f32.div)))
+        :f32.+inf))
+
+;; f32.div 0/0: IEEE 754 — 0/0 = NaN (Oracle: Node.js)
+(assert-event
+ (equal (result-of (list '(:f32.const 0) '(:f32.const 0) '(:f32.div)))
+        :f32.nan))
+
+;; f32.div neg/0: IEEE 754 — -5/0 = -Inf (Oracle: Node.js)
+(assert-event
+ (equal (result-of (list '(:f32.const -5) '(:f32.const 0) '(:f32.div)))
+        :f32.-inf))
 
 ;; f32.min: min(3, 5) = 3
 (assert-event
