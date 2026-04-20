@@ -5,16 +5,21 @@ ACL2 formalization of WASM 1.0 operational semantics, extending the Kestrel book
 Repo: `raymyers/awesome-verified-coding-agents` branch `add-wasm1-acl2-formalization-plan-try1`
 Subdir: `examples/wasm1-acl2-formalization-plan/`
 
-## Current Status (2026-04-18)
-- **Plan documents**: WASM1_PLAN.md (560+ lines, M0-M12) + ACL2_SEMANTICS_REF.md (900+ lines, 17 sections)
-- **ACL2 environment**: Verified working — SBCL 2.5.2, ACL2 8.7, Kestrel books certified
-- **Proof-of-concept**: Extended Kestrel execution.lisp with i32.sub, certified independently, 4 tests pass
-- **Critical gotchas documented**: 17 verified operational findings in ACL2_SEMANTICS_REF.md §17
+## Current Status (2026-04-20)
+- **170/170 WASM 1.0 instructions** implemented, certified, tested
+- **21 proof files, 204 proved/passed, 0 failures** (192 Q.E.D.s + 12 PASSED)
+- **execution.lisp**: 3168 lines, certifies with cert.pl
+- **ACL2_SEMANTICS_REF.md**: 1230+ lines, 19 sections including proof techniques catalog
+- **New**: proof-spec-edge-cases.lisp (35 Q.E.D.s: traps, shifts, rotations, conversions)
+- **New**: proof-algebraic-properties.lisp (27 Q.E.D.s: identity, annihilator, reflexivity)
+- **Critical gotchas documented**: 19 sections in ACL2_SEMANTICS_REF.md
 
 ## Key Files
 - `WASM1_PLAN.md` — Milestone plan with task bullets, MVP strategy, testing plan
 - `ACL2_SEMANTICS_REF.md` — SpecTec → ACL2 mapping, build commands, patterns, references
 - `execution.lisp` — Main semantics (canonical copy, also in src/)
+- `proofs/proof-spec-edge-cases.lisp` — 35 Q.E.D.s: trap, shift, rotate, clz/ctz, conversion edge cases
+- `proofs/proof-algebraic-properties.lisp` — 27 Q.E.D.s: identity, annihilator, reflexivity properties
 - `proofs/proof-add-spec.lisp` — Add spec + commutativity (2 theorems)
 - `proofs/proof-sub-spec.lisp` — Sub spec + self-zero + add-sub-inverse (3 theorems)
 - `tests/test-spot-check.lisp` — 20 ground-truth tests
@@ -100,12 +105,11 @@ cd tests/oracle && bash check-all.sh
 ALWAYS derive expected values from `wat2wasm` + Node.js FIRST, then encode in ACL2.
 Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 
-## Verified State (2026-04-18)
-- **156/170** WASM 1.0 instructions (91%), `execution.lisp` CERTIFIES (2856 lines)
+## Verified State (2026-04-20)
+- **170/170** WASM 1.0 instructions (100%), `execution.lisp` CERTIFIES (3168 lines)
 - **12/12** test files pass (224 assertions, 0 failures)
-- **16/17** proof files pass (110 Q.E.D.s; only float-spec has 3 failures)
-- **All non-float WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, memory, conversions
-- **Missing 14 float instructions**: copysign, nearest, trunc(f→f), reinterpret, f32/f64 load/store
+- **21/21** proof files pass (192 Q.E.D.s + 12 PASSED = 204, 0 failures)
+- **All WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, f32, f64, memory, conversions, tables
 
 ## Kestrel IEEE 754 Library (discovered 2026-04-19)
 `books/kestrel/floats/ieee-floats-as-bvs` provides exact IEEE 754 encode/decode:
@@ -116,8 +120,15 @@ Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 - Roundtrip theorems proven (non-NaN)
 - **Integration proof**: `proof-ieee754-integration.lisp` — 14 PASSED, 3 Q.E.D.
 
+## Key Proof Techniques (discovered 2026-04-20)
+- **Symbolic proofs with `run`**: Use `:expand ((:free (n s) (run n s)))` to force unfolding
+- **Theory for 170-case dispatch**: Enable specific execute functions + all state accessors
+- **BV library for sub(x,x)=0**: Enable `acl2::bvminus acl2::bvplus acl2::bvuminus acl2::bvchop`
+- **Rotation identity ash(-32)**: Use `(local (include-book "arithmetic-5/top" :dir :system))`
+- **Never put macros in enable**: `farg1` is a macro → cryptic theory evaluation error
+
 ## What's Next
-- Add 14 remaining float instructions using Kestrel ieee-floats library
-- Fix 3 float proof failures (theory hints need correct unfold list)
-- Guard verification (currently deferred with `:verify-guards nil`)
-- Module instantiation + binary parser integration
+- Module instantiation (M11.1)
+- NaN/signed zero IEEE 754 model (M11.2)
+- Guard verification on key functions (M11.5)
+- More spec test edge cases for i64 (M11.4)
