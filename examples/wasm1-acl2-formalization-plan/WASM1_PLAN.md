@@ -392,7 +392,7 @@ ACL2 just computes the answer and checks equality.
 ```
 
 **Coverage**: Every instruction gets at least 2 tests (normal case + edge case/trap).
-Currently: 32 test/proof files, ~50+ individual assert-events.
+Currently: 35 test/proof files (13 test + 22 proof), ~256 test assertions.
 
 ### Level 2: Oracle Testing (E2E Pipeline)
 WAT source code compiled with `wat2wasm`, executed with Node.js WASM runtime
@@ -420,7 +420,7 @@ Universal properties proven by ACL2's theorem prover.
   :hints (("Goal" :in-theory (enable ...))))
 ```
 
-Currently: 192 Q.E.D.s across 21 proof files + 224 test assertions via `ld`.
+Currently: 212 Q.E.D.s across 22 proof files + 256 test assertions via `ld`.
 
 ### Level 4: Certification
 Book certification ensures soundness. Use `cert.pl`:
