@@ -29,7 +29,7 @@
 | M5b: Globals | ✅ Verified | global.get, global.set, globalinst |
 | M6: Floating-Point | ✅ Complete | f32/f64 arith, cmp, unary, copysign, trunc, nearest — all 170 instrs |
 | M7: Tables + call_indirect | ✅ Verified | table, call_indirect dispatch |
-| M8: Proofs | ✅ Verified | 165 Q.E.D.s + 12 PASSED across 20 proof files |
+| M8: Proofs | ✅ Verified | 192 Q.E.D.s + 12 PASSED = 204 across 21 proof files |
 | M9: Validation | ✅ Verified | Type checker + 12 soundness theorems + 70 validation tests |
 | M10: E2E Pipeline | ✅ Done | WAT → .wasm → ACL2 S-expr → execution |
 | M11: IEEE 754 Integration | ✅ Complete | Reinterpret, f32/f64 load/store via Kestrel ieee-floats-as-bvs |
@@ -41,7 +41,7 @@
 | Instructions in `execution.lisp` | **170 / 170 WASM 1.0 (100%)** |
 | `execution.lisp` certifies (`cert.pl`) | ✅ Yes (3168 lines, 3.16s) |
 | Test files passing | 12 / 12 (224 assertions, 0 failures) |
-| Proof files passing | **20 / 20 (165 Q.E.D.s + 12 PASSED = 177, 0 failures)** |
+| Proof files passing | **21 / 21 (192 Q.E.D.s + 12 PASSED = 204, 0 failures)** |
 | Validation tests | 70 PASSED, 0 FAILED |
 | Missing instructions | **0** |
 
@@ -418,7 +418,7 @@ Universal properties proven by ACL2's theorem prover.
   :hints (("Goal" :in-theory (enable ...))))
 ```
 
-Currently: 165 Q.E.D.s across 20 proof files + 224 test assertions via `ld`.
+Currently: 192 Q.E.D.s across 21 proof files + 224 test assertions via `ld`.
 
 ### Level 4: Certification
 Book certification ensures soundness. Use `cert.pl`:
@@ -594,7 +594,7 @@ The formalization is **complete for integer WASM** when:
 1. ✅ All WASM 1.0 instructions: 170/170 (100%)
 2. ✅ execution.lisp certifies with `cert.pl` (3168 lines, 3.16s)
 3. ✅ 12/12 test files pass (224 assertions, 0 failures)
-4. ✅ **20/20 proof files pass (165 Q.E.D.s + 12 PASSED = 177, 0 failures)**
+4. ✅ **21/21 proof files pass (192 Q.E.D.s + 12 PASSED = 204, 0 failures)**
 5. ✅ E2E pipeline demonstrated (WAT → .wasm → ACL2 → execution)
 6. ✅ Code extends Kestrel WASM books properly (include-book compatible)
 7. ✅ IEEE 754 floating-point: all 14 remaining instructions implemented via Kestrel ieee-floats-as-bvs

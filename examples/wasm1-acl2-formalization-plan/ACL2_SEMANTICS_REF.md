@@ -1098,7 +1098,7 @@ All 57 reduction rules from `8-reduction.spectec` are covered:
 
 ### 18.7 Recommendations for Kestrel collaboration
 
-1. **The full WASM 1.0 semantics are complete.** 170/170 instructions certify, all reduction rules are covered, 142 theorems/tests pass across 19 proof files. This covers all WASM 1.0 instructions including IEEE 754 float operations via Kestrel's ieee-floats-as-bvs library.
+1. **The full WASM 1.0 semantics are complete.** 170/170 instructions certify, all reduction rules are covered, 204 theorems/tests pass across 21 proof files. This covers all WASM 1.0 instructions including IEEE 754 float operations via Kestrel's ieee-floats-as-bvs library.
 
 2. **Float support needs an IEEE 754 bit-level model.** The current rational approximation works for well-behaved programs but fails for NaN propagation, signed zero, and bit-level reinterpretation. Recommend aligning with an existing ACL2 IEEE 754 formalization if one exists.
 
@@ -1107,3 +1107,124 @@ All 57 reduction rules from `8-reduction.spectec` are covered:
 4. **Guard verification is deferred** (`:verify-guards nil`). Full guard verification would strengthen the formalization but isn't required for proof use.
 
 5. **Module instantiation is not yet modeled.** The current model takes pre-decoded instruction lists; it doesn't handle the WASM binary module format or the instantiation algorithm (linking, start function, etc.). Kestrel's `parse-binary.lisp` handles the parsing side.
+
+---
+
+## §19 Proof Techniques Catalog (added 2026-04-20)
+
+### 19.1 Concrete oracle tests (Level 1)
+
+Pattern: compute oracle value from V8/Node.js, embed as `defthm`:
+```lisp
+(defthm i32-div-s-overflow-traps
+  (equal (run 3 (mk (list (list :i32.const 2147483648)
+                           (list :i32.const 4294967295)
+                           '(:i32.div_s))))
+         :trap)
+  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+```
+Key: ACL2 fully evaluates ground terms. No symbolic reasoning needed.
+This is the cheapest type of proof and catches most bugs.
+
+### 19.2 Symbolic universal proofs (Level 3)
+
+Pattern: prove `∀x. property(x)`:
+```lisp
+(defthm i32-div-s-any-by-zero-traps
+  (implies (u32p x)
+           (equal (run 3 (mk (list (list :i32.const x) '(:i32.const 0) '(:i32.div_s))))
+                  :trap))
+  :hints (("Goal" :in-theory (enable . #.*edge-theory*)
+                  :expand ((:free (n s) (run n s))))))
+```
+
+**Critical lesson**: `execute-instr` has 170+ cases in a `cond`. When `run` needs
+to dispatch on a concrete opcode (`:i32.div_s`) but with a symbolic state, the
+prover may not open `run` automatically. Solution: **`:expand ((:free (n s) (run n s)))`**
+forces `run` to unfold at every call site.
+
+### 19.3 Theory management for large case dispatches
+
+Problem: `execute-instr` is a huge `cond` with 170 arms. Enabling it naively causes
+exponential case splitting on symbolic states.
+
+Solution: Use a curated theory constant:
+```lisp
+(defconst *edge-theory*
+  '(mk run step execute-instr
+    execute-i32.const execute-i32.div_s ...
+    ;; Include ALL accessor/constructor functions
+    current-frame current-instrs current-operand-stack ...))
+```
+
+**Gotcha**: Never include macros (e.g., `farg1`) in enable lists. ACL2 gives a
+cryptic "theory expression could not be evaluated" error. `farg1` is a macro
+for `cadr`; it expands automatically without being in the theory.
+
+### 19.4 BV library lemmas for arithmetic properties
+
+Problem: `bvminus(x, x) = 0` doesn't simplify automatically.
+
+Solution: Enable BV internals:
+```lisp
+:hints (("Goal" :in-theory (enable acl2::bvminus acl2::bvplus
+                                    acl2::bvuminus acl2::bvchop
+                                    . #.*alg-theory*)))
+```
+
+For rotation identity (`rotl(x, 0) = x`), the implementation uses `(logior (ash x 0) (ash x -32))`.
+ACL2 doesn't know `ash(x, -32) = 0` for u32 x. Solution:
+```lisp
+(local (include-book "arithmetic-5/top" :dir :system))
+(defthm ash-neg32-of-u32
+  (implies (unsigned-byte-p 32 x)
+           (equal (ash x -32) 0)))
+```
+
+### 19.5 Proof file structure pattern
+
+Every proof file follows this skeleton:
+```lisp
+(in-package "ACL2")
+(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
+(in-package "WASM")
+(include-book "kestrel/wasm/execution" :dir :system)
+(set-guard-checking :none)
+
+;; State constructors (defund mk ...)
+;; Theory constant (defconst *my-theory* '(...))
+;; Helper lemmas (local include-books, defthms)
+;; Main theorems
+```
+
+### 19.6 Algebraic instruction properties catalog
+
+Proved symbolic properties (all ∀x,y ∈ u32):
+
+| Category | Property | Theorem name |
+|----------|----------|--------------|
+| Add | add(x,0)=x, add(0,x)=x | i32-add-right/left-identity |
+| Sub | sub(x,0)=x, sub(x,x)=0 | i32-sub-right-identity, i32-sub-self-is-zero |
+| Mul | mul(x,1)=x, mul(1,x)=x, mul(x,0)=0 | i32-mul-right/left-identity, i32-mul-zero-annihilates |
+| And | and(x,0)=0, and(x,MAX)=x | i32-and-zero-annihilates, i32-and-all-ones-identity |
+| Or | or(x,0)=x, or(x,MAX)=MAX | i32-or-identity, i32-or-all-ones-absorbs |
+| Xor | xor(x,0)=x, xor(x,x)=0 | i32-xor-identity, i32-xor-self-annihilates |
+| Shift | shl(x,0)=x, shr_u(x,0)=x | i32-shl/shr-u-zero-identity |
+| Rotate | rotl(x,0)=x | i32-rotl-zero-identity |
+| Compare | eq(x,x)=1, ne(x,x)=0 | i32-eq-reflexive, i32-ne-anti-reflexive |
+| Compare | le_u(x,x)=1, ge_u(x,x)=1 | i32-le/ge-u-reflexive |
+| Compare | lt_u(x,x)=0, gt_u(x,x)=0 | i32-lt/gt-u-irreflexive |
+| Compare | le_s(x,x)=1, ge_s(x,x)=1 | i32-le/ge-s-reflexive |
+
+### 19.7 Trap correctness catalog
+
+| Input | Expected | Proved |
+|-------|----------|--------|
+| div_s(MIN,-1) | trap | ✅ concrete |
+| div_s(x,0) ∀x | trap | ✅ symbolic |
+| div_u(x,0) ∀x | trap | ✅ symbolic |
+| rem_s(x,0) ∀x | trap | ✅ symbolic |
+| rem_u(x,0) ∀x | trap | ✅ symbolic |
+| rem_s(MIN,-1) | 0 (NOT trap) | ✅ concrete |
+| div_s(-7,2) | -3 (truncate toward zero) | ✅ concrete |
+| rem_s(-7,2) | -1 (sign follows dividend) | ✅ concrete |
