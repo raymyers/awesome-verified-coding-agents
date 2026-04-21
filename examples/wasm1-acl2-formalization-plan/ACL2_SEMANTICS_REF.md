@@ -1368,3 +1368,128 @@ the sign of zero. Per WASM 1.0 spec §3.3.1, operations like `(-0) × (+1)` shou
 produce `-0`; our model gives `+0`. Only `neg`, `abs`, `copysign`, and `div` handle
 signed zero sign propagation correctly. This is documented in `WASM1_PLAN.md §11.2`.
 
+
+---
+
+## §21 IEEE 754 Inf Arithmetic (M14)
+
+### 21.1 Atoms and Recognition
+
+Six new `float-specialp` atoms added in M14 (same as M12, but now used in arithmetic):
+- `:f32.+inf`, `:f32.-inf`  — positive/negative infinity for f32
+- `:f64.+inf`, `:f64.-inf`  — positive/negative infinity for f64
+
+Helper predicates (defined before the arithmetic section):
+```lisp
+(defun f32-infp (v) (or (eq v :f32.+inf) (eq v :f32.-inf)))
+(defun f64-infp (v) (or (eq v :f64.+inf) (eq v :f64.-inf)))
+(defun f32-zerovalp (v) (or (eq v :f32.+0) (eq v :f32.-0) (and (f32-valp v) (= (farg1 v) 0))))
+(defun f32-sign-negativep (arg)  ; defined early (before f32 arithmetic)
+  (or (eq arg :f32.-0) (eq arg :f32.-inf) (and (f32-valp arg) (< (farg1 arg) 0))))
+```
+
+**CRITICAL**: `f32-sign-negativep` and `f64-sign-negativep` must be defined BEFORE the
+f32/f64 arithmetic section (they're used by `f32-inf-mul`, `execute-f32.div`, etc.).
+In the original M13 code they were in the copysign section — M14 moved them earlier.
+
+### 21.2 Inf Rules (IEEE 754)
+
+| Expression | Result | Rule |
+|-----------|--------|------|
+| `+Inf + +Inf` | `+Inf` | Same-sign infinities add |
+| `+Inf + -Inf` | `NaN` | Opposite-sign cancel |
+| `x + ±Inf`   | `±Inf` | Infinity absorbs finite |
+| `+Inf - +Inf` | `NaN`  | Inf minus itself |
+| `+Inf - -Inf` | `+Inf` | Inf minus neg-inf |
+| `±Inf × 0`   | `NaN`  | Indeterminate form |
+| `±Inf × ±Inf`| `±Inf` | Sign = product of signs |
+| `±Inf × nonzero` | `±Inf` | Sign = product |
+| `±Inf / ±Inf`| `NaN`  | Indeterminate |
+| `±Inf / finite`| `±Inf`| Sign preserved/flipped |
+| `finite / ±Inf`| `±0` | Shrinks to zero |
+| `min(-Inf, x)` | `-Inf` | −Inf is global min |
+| `max(+Inf, x)` | `+Inf` | +Inf is global max |
+
+### 21.3 Implementation Pattern
+
+The `def-f32-binop-inf` macro wraps a binary op with NaN-propagation then
+Inf-dispatch, then falls through to finite arithmetic:
+
+```lisp
+(defmacro def-f32-binop-inf (fn-name finite-expr inf-fn)
+  `(defun ,fn-name (state)
+     (declare (xargs :guard (statep state) :verify-guards nil))
+     (b* ((ostack (current-operand-stack state))
+          ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
+          (arg2 (top-operand ostack))
+          (arg1 (top-operand (pop-operand ostack)))
+          ;; 1. NaN propagates
+          ((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
+           (let* ((ostack (push-operand :f32.nan ...))) (advance-instrs state)))
+          ;; 2. Inf dispatch
+          ((when (or (f32-infp arg1) (f32-infp arg2)))
+           (let* ((result (,inf-fn arg1 arg2))
+                  (ostack (push-operand result ...))) (advance-instrs state)))
+          ;; 3. ±0 dispatch
+          ((when (or (f32-zerovalp arg1) (f32-zerovalp arg2)))
+           ...)
+          ;; 4. Finite arithmetic
+          ((when (not (and (f32-valp arg1) (f32-valp arg2)))) :trap)
+          (v1 (farg1 arg1)) (v2 (farg1 arg2))
+          (result (make-f32-val ,finite-expr)) ...)
+       (advance-instrs state))))
+```
+
+### 21.4 Inf helper functions
+
+```lisp
+;; add: +Inf + -Inf = NaN; same-sign add = that Inf; finite + ±Inf = ±Inf
+(defun f32-inf-add (a b) ...)
+
+;; sub: rearranges to add(a, flip(b))
+(defun f32-flip-inf (v) (if (eq v :f32.+inf) :f32.-inf :f32.+inf))
+(defun f32-inf-sub (a b) (f32-inf-add a (f32-flip-inf b)))
+
+;; mul: ±Inf × 0 = NaN; sign = XOR of signs
+(defun f32-inf-mul (a b)
+  (if (or (f32-zerovalp a) (f32-zerovalp b)) :f32.nan
+    (if (not (eq (f32-sign-negativep a) (f32-sign-negativep b))) :f32.-inf :f32.+inf)))
+
+;; min/max: -Inf always wins min; +Inf always wins max
+(defun f32-inf-min (a b) (if (eq a :f32.-inf) :f32.-inf (if (eq b :f32.-inf) :f32.-inf a)))
+(defun f32-inf-max (a b) (if (eq a :f32.+inf) :f32.+inf (if (eq b :f32.+inf) :f32.+inf a)))
+```
+
+### 21.5 Testing Inf Arithmetic
+
+Use pre-populated operand stacks for Inf atom tests (atoms can't be emitted
+by `:f32.const`):
+```lisp
+(defun ia-make-state (arg1 arg2 instr)
+  (make-state
+   :call-stack (list (make-frame ... :operand-stack (list arg2 arg1)
+                                     :instrs (list instr) ...)) ...))
+
+(defun ia-top (arg1 arg2 instr)
+  (top-operand (current-operand-stack (step (ia-make-state arg1 arg2 instr)))))
+
+;; Stack ordering: arg2 = top (popped first), arg1 = below
+;; ia-top(a, b, op) computes op(a, b)
+```
+
+### 21.6 Distributivity + Shift Laws
+
+`proof-distributivity.lisp` proves BV-arithmetic identities:
+- `bvmult 32 (bvplus 32 a b) c = bvplus 32 (bvmult 32 a c) (bvmult 32 b c)`
+- Same for `bvminus`, same for 64-bit
+- `bvshl 32 x k = bvmult 32 x (2^k)` for k ∈ {1,2,3}
+
+Proof strategy: enable `acl2::bvmult`, `acl2::bvplus`, `acl2::bvminus`, `acl2::bvchop`
+and let `arithmetic-5` reduce the modular arithmetic. Needs:
+```lisp
+(local (include-book "kestrel/bv/rules" :dir :system))
+(local (include-book "arithmetic-5/top" :dir :system))
+```
+
+**Note**: Multi-step WASM execution proofs for distributivity (5–7 steps involving `mul`)
+are too slow for ACL2 to discharge automatically. Prove at the BV level instead.

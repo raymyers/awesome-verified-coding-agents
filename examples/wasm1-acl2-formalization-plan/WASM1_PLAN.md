@@ -35,19 +35,22 @@
 | M11: IEEE 754 Integration | ✅ Complete | Reinterpret, f32/f64 load/store via Kestrel ieee-floats-as-bvs |
 | M12: NaN/Inf Propagation | ✅ Complete | float-specialp, NaN propagation in all float ops, 20 formal theorems |
 | M13: Signed Zero | ✅ Complete | `:f32.±0`/`:f64.±0` atoms; neg/abs/div/copysign/cmp; 11 formal theorems |
+| M14: Inf Arithmetic | ✅ Complete | ±Inf in add/sub/mul/div/min/max for f32+f64; 34 oracle-verified tests |
+| Distributivity | ✅ Proved | BV mul-over-add/sub (i32+i64); shl-as-mul (i32+i64); 12 Q.E.D.s |
 
-### Verified Numbers (machine-checked 2026-04-20)
+### Verified Numbers (machine-checked 2026-04-21)
 
 | Metric | Value |
 |---|---|
 | Instructions in `execution.lisp` | **170 / 170 WASM 1.0 (100%)** |
-| `execution.lisp` certifies (`cert.pl`) | ✅ Yes (3496 lines) |
-| Test files passing | **14 / 14 (278 assertions, 0 failures)** |
-| Proof files passing | **26 / 26 (268 Q.E.D.s, 0 failures)** |
+| `execution.lisp` certifies (`cert.pl`) | ✅ Yes (3718 lines) |
+| Test files passing | **15 / 15 (312 assertions, 0 failures)** |
+| Proof files passing | **27 / 27 (280 Q.E.D.s, 0 failures)** |
 | Validation tests | 70 PASSED, 0 FAILED |
 | Missing instructions | **0** |
 | IEEE 754 NaN propagation | ✅ All float binops, unary ops, comparisons, div, sqrt |
 | IEEE 754 Signed Zero | ✅ neg/abs/copysign/div/cmp all handle ±0 correctly |
+| IEEE 754 Inf Arithmetic | ✅ ±Inf in add/sub/mul/div/min/max (sign-product rules) |
 
 **All 170 WASM 1.0 instructions are implemented, certified, tested, with NaN/Inf/±0 propagation.**
 
@@ -326,6 +329,7 @@ WAT source → wat2wasm → .wasm binary → wasm2acl2.js → ACL2 S-exprs → A
 - [ ] Explicit NaN/Infinity representation (not ACL2 rationals)
 - [x] NaN propagation rules (M12 complete)
 - [x] Signed zero handling (M13: `:f32.±0`/`:f64.±0` atoms, neg/abs/div/copysign/cmp — 11 proofs)
+- [x] Full Inf arithmetic (M14): ±Inf in add/sub/mul/div/min/max; sign-product rules; f32+f64
 
 ### 11.3 Edge Cases & Traps ✅ Done (2026-04-20)
 - [x] i32.div_s overflow: `(-2^31) / (-1)` → trap (proved)
@@ -422,7 +426,7 @@ Universal properties proven by ACL2's theorem prover.
   :hints (("Goal" :in-theory (enable ...))))
 ```
 
-Currently: 268 Q.E.D.s across 26 proof files + 278 test assertions via `ld`.
+Currently: 280 Q.E.D.s across 27 proof files + 312 test assertions via `ld`.
 
 ### Level 4: Certification
 Book certification ensures soundness. Use `cert.pl`:
@@ -596,9 +600,9 @@ examples/wasm1-acl2-formalization-plan/
 
 The formalization is **complete** when:
 1. ✅ All WASM 1.0 instructions: 170/170 (100%)
-2. ✅ execution.lisp certifies with `cert.pl` (3496 lines)
-3. ✅ **14/14 test files pass (278 assertions, 0 failures)**
-4. ✅ **26/26 proof files pass (268 Q.E.D.s, 0 failures)**
+2. ✅ execution.lisp certifies with `cert.pl` (3718 lines)
+3. ✅ **15/15 test files pass (312 assertions, 0 failures)**
+4. ✅ **27/27 proof files pass (280 Q.E.D.s, 0 failures)**
 5. ✅ E2E pipeline demonstrated (WAT → .wasm → ACL2 → execution)
 6. ✅ Code extends Kestrel WASM books properly (include-book compatible)
 7. ✅ IEEE 754 floating-point: all 14 remaining instructions implemented via Kestrel ieee-floats-as-bvs
@@ -612,12 +616,21 @@ The formalization is **complete** when:
    - neg(+0)=-0, neg(-0)=+0; abs(±0)=+0; +0==−0; pos/-0=−∞; copysign(x,−0)=−|x|
    - Updated def-f32/f64-binop macros accept ±0 (rational 0 for arithmetic)
    - 11 formal theorems + 23 oracle-verified test cases
-10. 🔲 Module instantiation + pure ACL2 binary parser integration (future work)
+10. ✅ **IEEE 754 Inf Arithmetic (M14)**
+    - ±Inf in f32/f64 add, sub, mul, div, min, max (sign-product rules throughout)
+    - `def-f32/f64-binop-inf` macros + `def-f64-binop-inf`; updated div for Inf/Inf=NaN
+    - 34 oracle-verified test cases (Node.js V8 ground truth)
+11. ✅ **Distributivity + Shift-Law Proofs**
+    - BV mul distributes over add/sub for i32 and i64 (6 theorems)
+    - `bvshl(x, k) = bvmult(x, 2^k)` for k∈{1,2,3}, i32 and i64 (6 theorems)
+    - Total: 12 Q.E.D.s in `proof-distributivity.lisp`
+12. 🔲 Module instantiation + pure ACL2 binary parser integration (future work)
 
 ### What "100% coverage" means practically
 - **All 170 WASM 1.0 instructions** are implemented and dispatch correctly
 - **IEEE 754 NaN propagation**: fully implemented per spec (M12)
 - **IEEE 754 Signed Zero**: ±0 atoms, neg/abs/copysign/div/cmp all correct (M13)
-- **IEEE 754 Inf arithmetic**: basic Inf support (neg/abs/div); full Inf binop arithmetic = future work
+- **IEEE 754 Inf Arithmetic**: full ±Inf in add/sub/mul/div/min/max with sign-product rules (M14)
+- **Algebraic proofs**: commutativity, associativity, distributivity, shift laws — 27 proof files, 280 Q.E.D.s
 - **Remaining work**: module instantiation, binary parser integration
 - **For verification targets**: integer and float proofs are both covered; module-level integration is the main gap

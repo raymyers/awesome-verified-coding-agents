@@ -1,0 +1,36 @@
+(module
+  ;; add
+  (func (export "add_posinf_finite")  (result f32) f32.const inf   f32.const 5.0   f32.add)
+  (func (export "add_neginf_finite")  (result f32) f32.const -inf  f32.const 5.0   f32.add)
+  (func (export "add_posinf_posinf")  (result f32) f32.const inf   f32.const inf   f32.add)
+  (func (export "add_posinf_neginf")  (result f32) f32.const inf   f32.const -inf  f32.add)
+  (func (export "add_neginf_neginf")  (result f32) f32.const -inf  f32.const -inf  f32.add)
+  (func (export "add_finite_posinf")  (result f32) f32.const 3.0   f32.const inf   f32.add)
+  ;; sub
+  (func (export "sub_posinf_finite")  (result f32) f32.const inf   f32.const 5.0   f32.sub)
+  (func (export "sub_finite_posinf")  (result f32) f32.const 5.0   f32.const inf   f32.sub)
+  (func (export "sub_posinf_posinf")  (result f32) f32.const inf   f32.const inf   f32.sub)
+  (func (export "sub_posinf_neginf")  (result f32) f32.const inf   f32.const -inf  f32.sub)
+  (func (export "sub_neginf_finite")  (result f32) f32.const -inf  f32.const 5.0   f32.sub)
+  (func (export "sub_finite_neginf")  (result f32) f32.const 5.0   f32.const -inf  f32.sub)
+  ;; mul
+  (func (export "mul_posinf_pos")     (result f32) f32.const inf   f32.const 2.0   f32.mul)
+  (func (export "mul_posinf_neg")     (result f32) f32.const inf   f32.const -2.0  f32.mul)
+  (func (export "mul_posinf_posinf")  (result f32) f32.const inf   f32.const inf   f32.mul)
+  (func (export "mul_posinf_neginf")  (result f32) f32.const inf   f32.const -inf  f32.mul)
+  (func (export "mul_posinf_zero")    (result f32) f32.const inf   f32.const 0.0   f32.mul)
+  (func (export "mul_neginf_neg")     (result f32) f32.const -inf  f32.const -2.0  f32.mul)
+  ;; div
+  (func (export "div_posinf_pos")     (result f32) f32.const inf   f32.const 2.0   f32.div)
+  (func (export "div_neginf_pos")     (result f32) f32.const -inf  f32.const 2.0   f32.div)
+  (func (export "div_posinf_neginf")  (result f32) f32.const inf   f32.const -inf  f32.div)
+  (func (export "div_pos_posinf")     (result f32) f32.const 2.0   f32.const inf   f32.div)
+  (func (export "div_neg_posinf")     (result f32) f32.const -2.0  f32.const inf   f32.div)
+  ;; min/max
+  (func (export "min_finite_posinf")  (result f32) f32.const 5.0   f32.const inf   f32.min)
+  (func (export "min_neginf_finite")  (result f32) f32.const -inf  f32.const 5.0   f32.min)
+  (func (export "min_posinf_neginf")  (result f32) f32.const inf   f32.const -inf  f32.min)
+  (func (export "max_finite_neginf")  (result f32) f32.const 5.0   f32.const -inf  f32.max)
+  (func (export "max_posinf_finite")  (result f32) f32.const inf   f32.const 5.0   f32.max)
+  (func (export "max_posinf_neginf")  (result f32) f32.const inf   f32.const -inf  f32.max)
+)

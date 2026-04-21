@@ -5,14 +5,15 @@ ACL2 formalization of WASM 1.0 operational semantics, extending the Kestrel book
 Repo: `raymyers/awesome-verified-coding-agents` branch `add-wasm1-acl2-formalization-plan-try1`
 Subdir: `examples/wasm1-acl2-formalization-plan/`
 
-## Current Status (2026-04-20)
-- **170/170 WASM 1.0 instructions** implemented, certified, tested (3496 lines)
-- **26 proof files, 268 Q.E.D.s, 0 failures**
-- **14/14 test files pass**, 278 assertions, 0 failures
+## Current Status (2026-04-21)
+- **170/170 WASM 1.0 instructions** implemented, certified, tested (3718 lines)
+- **27 proof files, 280 Q.E.D.s, 0 failures**
+- **15/15 test files pass**, 312 assertions, 0 failures
 - **M12**: IEEE 754 NaN/Inf propagation — float-specialp, 20 formal theorems, 28 oracle tests
 - **M13**: IEEE 754 Signed Zero — `:f32.±0`/`:f64.±0` atoms; neg/abs/div/copysign/cmp correct; 11 theorems
-- **New proofs**: commutativity (10), associativity (10), i64-algebraic (25), signed-zero (11)
-- **Critical gotchas + NaN/±0 design**: ACL2_SEMANTICS_REF.md §17-20
+- **M14**: IEEE 754 Inf Arithmetic — ±Inf in add/sub/mul/div/min/max; sign-product rules; 34 oracle tests
+- **Distributivity proofs**: BV mul-over-add/sub (i32+i64), shl-as-mul — 12 Q.E.D.s
+- **Critical gotchas + NaN/±0/Inf design**: ACL2_SEMANTICS_REF.md §17-21
 
 ## Key Files
 - `WASM1_PLAN.md` — Milestone plan with task bullets, MVP strategy, testing plan
@@ -105,14 +106,15 @@ cd tests/oracle && bash check-all.sh
 ALWAYS derive expected values from `wat2wasm` + Node.js FIRST, then encode in ACL2.
 Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 
-## Verified State (2026-04-20)
-- **170/170** WASM 1.0 instructions (100%), `execution.lisp` CERTIFIES (3496 lines)
-- **14/14** test files pass (278 assertions, 0 failures)
-- **26/26** proof files pass (268 Q.E.D.s, 0 failures)
+## Verified State (2026-04-21)
+- **170/170** WASM 1.0 instructions (100%), `execution.lisp` CERTIFIES (3718 lines)
+- **15/15** test files pass (312 assertions, 0 failures)
+- **27/27** proof files pass (280 Q.E.D.s, 0 failures)
 - **All WASM 1.0 instructions covered**: parametric, control, call, locals, globals, i32, i64, memory, f32/f64, conversions, reinterpret
 - **M12 complete**: IEEE 754 NaN propagation (float-specialp pattern), 0/0=NaN, x/0=±Inf, sqrt(-x)=NaN
 - **M13 complete**: IEEE 754 Signed Zero — neg(+0)=-0, abs(±0)=+0, +0==−0, x/-0=−∞ for x>0
-- **New proof files (2026-04-20)**: commutativity, associativity, i64-algebraic, signed-zero
+- **M14 complete**: IEEE 754 Inf Arithmetic — ±Inf in add/sub/mul/div/min/max; sign-product rules
+- **Distributivity**: BV mul-distributes-over-add/sub (i32+i64) + shl-as-mul laws (12 Q.E.D.s)
 - **Missing**: module instantiation, binary parser integration (future work)
 
 ## Kestrel IEEE 754 Library (discovered 2026-04-19)
@@ -134,6 +136,5 @@ Signed results from JS need u32 conversion: `-85` → `4294967211` (0xFFFFFFAB).
 ## What's Next
 - Module instantiation + binary parser integration (connect parse-binary.lisp to execution)
 - Guard verification (currently deferred with `:verify-guards nil`)
-- Full Inf arithmetic (Inf+Inf, Inf-Inf, etc. — currently traps for Inf binop operands)
-- More symbolic proofs: distributivity (mul over add), shift laws, mixed i32/i64 theorems
-- Signed zero sign propagation in mul/add/sub (currently loses sign; only neg/abs/copysign/div correct)
+- Formal Inf arithmetic proofs (theorems about M14 rules; currently only oracle-tested)
+- More symbolic proofs: De Morgan, absorption, rotation laws, mixed i32/i64 theorems

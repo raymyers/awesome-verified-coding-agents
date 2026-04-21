@@ -2282,10 +2282,193 @@
           (state (update-current-operand-stack ostack state)))
        (advance-instrs state))))
 
-;; f32 arithmetic
-(def-f32-binop execute-f32.add (+ v1 v2))
-(def-f32-binop execute-f32.sub (- v1 v2))
-(def-f32-binop execute-f32.mul (* v1 v2))
+;; ─── IEEE 754 Inf arithmetic helpers ──────────────────────────────────────────
+;;
+;; These helpers are called AFTER NaN propagation has been handled.
+;; They compute the result when at least one operand is ±Inf.
+;;
+;; Sign-product logic:
+;;   result is NEGATIVE iff exactly one of the inputs is negative.
+;;   (f32-sign-negativep already handles ±0, ±Inf, and finite values.)
+
+(defun f32-infp (v)
+  (declare (xargs :guard t :verify-guards nil))
+  (or (eq v :f32.+inf) (eq v :f32.-inf)))
+
+(defun f64-infp (v)
+  (declare (xargs :guard t :verify-guards nil))
+  (or (eq v :f64.+inf) (eq v :f64.-inf)))
+
+;; True if v is any form of zero: rational 0, :f32.+0, or :f32.-0
+(defun f32-zerovalp (v)
+  (declare (xargs :guard t :verify-guards nil))
+  (or (eq v :f32.+0) (eq v :f32.-0)
+      (and (f32-valp v) (= (farg1 v) 0))))
+
+(defun f64-zerovalp (v)
+  (declare (xargs :guard t :verify-guards nil))
+  (or (eq v :f64.+0) (eq v :f64.-0)
+      (and (f64-valp v) (= (farg1 v) 0))))
+
+;; IEEE 754 add with ±Inf (NaN already dispatched before calling this)
+;; Add: +Inf + -Inf = NaN; -Inf + +Inf = NaN; else the Inf arg dominates.
+(defun f32-inf-add (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (cond ((and (eq a :f32.+inf) (eq b :f32.-inf)) :f32.nan)
+        ((and (eq a :f32.-inf) (eq b :f32.+inf)) :f32.nan)
+        ((eq a :f32.+inf) :f32.+inf)
+        ((eq a :f32.-inf) :f32.-inf)
+        ((eq b :f32.+inf) :f32.+inf)
+        (t                :f32.-inf)))
+
+(defun f64-inf-add (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (cond ((and (eq a :f64.+inf) (eq b :f64.-inf)) :f64.nan)
+        ((and (eq a :f64.-inf) (eq b :f64.+inf)) :f64.nan)
+        ((eq a :f64.+inf) :f64.+inf)
+        ((eq a :f64.-inf) :f64.-inf)
+        ((eq b :f64.+inf) :f64.+inf)
+        (t                :f64.-inf)))
+
+;; IEEE 754 sub with ±Inf: sub(a,b) = add(a, neg(b))
+;; So flip sign of b, then call inf-add.
+(defun f32-flip-inf (v)
+  (declare (xargs :guard t :verify-guards nil))
+  (if (eq v :f32.+inf) :f32.-inf
+    (if (eq v :f32.-inf) :f32.+inf v)))
+
+(defun f64-flip-inf (v)
+  (declare (xargs :guard t :verify-guards nil))
+  (if (eq v :f64.+inf) :f64.-inf
+    (if (eq v :f64.-inf) :f64.+inf v)))
+
+(defun f32-inf-sub (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (f32-inf-add a (f32-flip-inf b)))
+
+(defun f64-inf-sub (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (f64-inf-add a (f64-flip-inf b)))
+
+;; Sign predicates (needed by inf-mul and execute-f32/f64.div below, and also
+;; used later by execute-f32/f64.copysign at their definition sites)
+(defun f32-sign-negativep (arg)
+  (declare (xargs :guard t :verify-guards nil))
+  (or (eq arg :f32.-0) (eq arg :f32.-inf)
+      (and (f32-valp arg) (< (farg1 arg) 0))))
+
+(defun f64-sign-negativep (arg)
+  (declare (xargs :guard t :verify-guards nil))
+  (or (eq arg :f64.-0) (eq arg :f64.-inf)
+      (and (f64-valp arg) (< (farg1 arg) 0))))
+
+;; IEEE 754 mul with ±Inf (NaN already dispatched)
+;; ±Inf * ±0 = NaN; ±Inf * ±Inf or ±Inf * nonzero-finite = ±Inf (sign = product)
+(defun f32-inf-mul (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (if (or (f32-zerovalp a) (f32-zerovalp b)) :f32.nan
+    (if (not (eq (f32-sign-negativep a) (f32-sign-negativep b)))
+        :f32.-inf :f32.+inf)))
+
+(defun f64-inf-mul (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (if (or (f64-zerovalp a) (f64-zerovalp b)) :f64.nan
+    (if (not (eq (f64-sign-negativep a) (f64-sign-negativep b)))
+        :f64.-inf :f64.+inf)))
+
+;; IEEE 754 min/max with ±Inf (NaN already dispatched)
+;; min: -Inf wins (smallest possible); +Inf yields to any other value.
+;; max: +Inf wins (largest possible); -Inf yields to any other value.
+(defun f32-inf-min (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (cond ((eq a :f32.-inf) :f32.-inf)
+        ((eq b :f32.-inf) :f32.-inf)
+        ((eq a :f32.+inf) b)
+        (t               a)))   ; b is +Inf
+
+(defun f64-inf-min (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (cond ((eq a :f64.-inf) :f64.-inf)
+        ((eq b :f64.-inf) :f64.-inf)
+        ((eq a :f64.+inf) b)
+        (t               a)))
+
+(defun f32-inf-max (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (cond ((eq a :f32.+inf) :f32.+inf)
+        ((eq b :f32.+inf) :f32.+inf)
+        ((eq a :f32.-inf) b)
+        (t               a)))   ; b is -Inf
+
+(defun f64-inf-max (a b)
+  (declare (xargs :guard t :verify-guards nil))
+  (cond ((eq a :f64.+inf) :f64.+inf)
+        ((eq b :f64.+inf) :f64.+inf)
+        ((eq a :f64.-inf) b)
+        (t               a)))
+
+;; ─── Macro for Inf-aware f32 binop ────────────────────────────────────────────
+;; Same as def-f32-binop but inserts an Inf handler between NaN and ±0 checks.
+(defmacro def-f32-binop-inf (name finite-expr inf-fn)
+  `(defun ,name (state)
+     (declare (xargs :guard (statep state) :verify-guards nil))
+     (b* ((ostack (current-operand-stack state))
+          ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
+          (arg2 (top-operand ostack))
+          (arg1 (top-operand (pop-operand ostack)))
+          ;; IEEE 754: NaN propagates
+          ((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
+           (let* ((ostack (push-operand :f32.nan (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
+          ;; IEEE 754: ±Inf arithmetic
+          ((when (or (f32-infp arg1) (f32-infp arg2)))
+           (let* ((result (,inf-fn arg1 arg2))
+                  (ostack (push-operand result (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
+          ;; Accept finite f32-valp or signed zeros (±0 treated as rational 0)
+          ((when (not (and (or (f32-valp arg1) (eq arg1 :f32.+0) (eq arg1 :f32.-0))
+                           (or (f32-valp arg2) (eq arg2 :f32.+0) (eq arg2 :f32.-0))))) :trap)
+          (v1 (if (f32-valp arg1) (farg1 arg1) 0))
+          (v2 (if (f32-valp arg2) (farg1 arg2) 0))
+          (result (make-f32-val ,finite-expr))
+          (ostack (push-operand result (pop-operand (pop-operand ostack))))
+          (state (update-current-operand-stack ostack state)))
+       (advance-instrs state))))
+
+(defmacro def-f64-binop-inf (name finite-expr inf-fn)
+  `(defun ,name (state)
+     (declare (xargs :guard (statep state) :verify-guards nil))
+     (b* ((ostack (current-operand-stack state))
+          ((when (not (<= 2 (operand-stack-height ostack)))) :trap)
+          (arg2 (top-operand ostack))
+          (arg1 (top-operand (pop-operand ostack)))
+          ;; IEEE 754: NaN propagates
+          ((when (or (eq arg1 :f64.nan) (eq arg2 :f64.nan)))
+           (let* ((ostack (push-operand :f64.nan (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
+          ;; IEEE 754: ±Inf arithmetic
+          ((when (or (f64-infp arg1) (f64-infp arg2)))
+           (let* ((result (,inf-fn arg1 arg2))
+                  (ostack (push-operand result (pop-operand (pop-operand ostack))))
+                  (state (update-current-operand-stack ostack state)))
+             (advance-instrs state)))
+          ;; Accept finite f64-valp or signed zeros
+          ((when (not (and (or (f64-valp arg1) (eq arg1 :f64.+0) (eq arg1 :f64.-0))
+                           (or (f64-valp arg2) (eq arg2 :f64.+0) (eq arg2 :f64.-0))))) :trap)
+          (v1 (if (f64-valp arg1) (farg1 arg1) 0))
+          (v2 (if (f64-valp arg2) (farg1 arg2) 0))
+          (result (make-f64-val ,finite-expr))
+          (ostack (push-operand result (pop-operand (pop-operand ostack))))
+          (state (update-current-operand-stack ostack state)))
+       (advance-instrs state))))
+
+;; f32 arithmetic (Inf-aware)
+(def-f32-binop-inf execute-f32.add (+ v1 v2) f32-inf-add)
+(def-f32-binop-inf execute-f32.sub (- v1 v2) f32-inf-sub)
+(def-f32-binop-inf execute-f32.mul (* v1 v2) f32-inf-mul)
 
 (defun execute-f32.div (state)
   (declare (xargs :guard (statep state) :verify-guards nil))
@@ -2296,6 +2479,22 @@
        ;; IEEE 754: NaN propagates
        ((when (or (eq arg1 :f32.nan) (eq arg2 :f32.nan)))
         (let* ((ostack (push-operand :f32.nan (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ;; IEEE 754: ±Inf / ±Inf = NaN; ±Inf / finite_nonzero = ±Inf; finite / ±Inf = ±0
+       ((when (or (f32-infp arg1) (f32-infp arg2)))
+        (let* ((result
+                (cond
+                 ;; ±Inf / ±Inf = NaN
+                 ((and (f32-infp arg1) (f32-infp arg2)) :f32.nan)
+                 ;; ±Inf / finite_nonzero → ±Inf (sign = product of signs)
+                 ((f32-infp arg1)
+                  (if (not (eq (f32-sign-negativep arg1) (f32-sign-negativep arg2)))
+                      :f32.-inf :f32.+inf))
+                 ;; finite / ±Inf → ±0 (sign = product of signs)
+                 (t (if (not (eq (f32-sign-negativep arg1) (f32-sign-negativep arg2)))
+                        :f32.-0 :f32.+0))))
+               (ostack (push-operand result (pop-operand (pop-operand ostack))))
                (state (update-current-operand-stack ostack state)))
           (advance-instrs state)))
        ;; IEEE 754: x/±0 — sign of Inf depends on sign of zero denominator
@@ -2309,6 +2508,14 @@
                   (if (> v1 0)
                       (if neg-denom :f32.-inf :f32.+inf)
                     (if neg-denom :f32.+inf :f32.-inf))))
+               (ostack (push-operand special (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ;; Handle ±0 numerator (treat as rational 0)
+       ((when (or (eq arg1 :f32.+0) (eq arg1 :f32.-0)))
+        (let* ((v2 (if (f32-valp arg2) (farg1 arg2) 0))
+               (special (if (= v2 0) :f32.nan
+                          (make-f32-val 0)))
                (ostack (push-operand special (pop-operand (pop-operand ostack))))
                (state (update-current-operand-stack ostack state)))
           (advance-instrs state)))
@@ -2327,8 +2534,8 @@
        (state (update-current-operand-stack ostack state)))
     (advance-instrs state)))
 
-(def-f32-binop execute-f32.min (min v1 v2))
-(def-f32-binop execute-f32.max (max v1 v2))
+(def-f32-binop-inf execute-f32.min (min v1 v2) f32-inf-min)
+(def-f32-binop-inf execute-f32.max (max v1 v2) f32-inf-max)
 
 ;; f32 unary
 (defun execute-f32.neg (state)
@@ -2503,10 +2710,7 @@
 ;; IEEE 754: copysign(NaN, x) = NaN.
 ;; Signed zeros: copysign(x, -0) = negative x; copysign(x, +0) = positive x.
 ;; ±Inf magnitude: copysign(±Inf, sign) = ±Inf following sign.
-(defun f32-sign-negativep (arg)
-  (declare (xargs :guard t :verify-guards nil))
-  (or (eq arg :f32.-0) (eq arg :f32.-inf)
-      (and (f32-valp arg) (< (farg1 arg) 0))))
+;; (f32-sign-negativep is defined in the Inf-arithmetic helpers section above)
 
 (defun execute-f32.copysign (state)
   (declare (xargs :guard (statep state) :verify-guards nil))
@@ -2546,10 +2750,10 @@
 (def-f32-cmpop execute-f32.le (<= v1 v2))
 (def-f32-cmpop execute-f32.ge (>= v1 v2))
 
-;; f64 arithmetic
-(def-f64-binop execute-f64.add (+ v1 v2))
-(def-f64-binop execute-f64.sub (- v1 v2))
-(def-f64-binop execute-f64.mul (* v1 v2))
+;; f64 arithmetic (Inf-aware)
+(def-f64-binop-inf execute-f64.add (+ v1 v2) f64-inf-add)
+(def-f64-binop-inf execute-f64.sub (- v1 v2) f64-inf-sub)
+(def-f64-binop-inf execute-f64.mul (* v1 v2) f64-inf-mul)
 
 (defun execute-f64.div (state)
   (declare (xargs :guard (statep state) :verify-guards nil))
@@ -2560,6 +2764,19 @@
        ;; IEEE 754: NaN propagates
        ((when (or (eq arg1 :f64.nan) (eq arg2 :f64.nan)))
         (let* ((ostack (push-operand :f64.nan (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
+       ;; IEEE 754: ±Inf / ±Inf = NaN; ±Inf / finite = ±Inf; finite / ±Inf = ±0
+       ((when (or (f64-infp arg1) (f64-infp arg2)))
+        (let* ((result
+                (cond
+                 ((and (f64-infp arg1) (f64-infp arg2)) :f64.nan)
+                 ((f64-infp arg1)
+                  (if (not (eq (f64-sign-negativep arg1) (f64-sign-negativep arg2)))
+                      :f64.-inf :f64.+inf))
+                 (t (if (not (eq (f64-sign-negativep arg1) (f64-sign-negativep arg2)))
+                        :f64.-0 :f64.+0))))
+               (ostack (push-operand result (pop-operand (pop-operand ostack))))
                (state (update-current-operand-stack ostack state)))
           (advance-instrs state)))
        ;; IEEE 754: x/±0 — sign of Inf depends on sign of zero denominator
@@ -2574,10 +2791,18 @@
                (ostack (push-operand special (pop-operand (pop-operand ostack))))
                (state (update-current-operand-stack ostack state)))
           (advance-instrs state)))
+       ;; Handle ±0 numerator
+       ((when (or (eq arg1 :f64.+0) (eq arg1 :f64.-0)))
+        (let* ((v2 (if (f64-valp arg2) (farg1 arg2) 0))
+               (special (if (= v2 0) :f64.nan
+                          (make-f64-val 0)))
+               (ostack (push-operand special (pop-operand (pop-operand ostack))))
+               (state (update-current-operand-stack ostack state)))
+          (advance-instrs state)))
        ((when (not (and (f64-valp arg1) (f64-valp arg2)))) :trap)
        (v1 (farg1 arg1))
        (v2 (farg1 arg2))
-       ;; Finite x/0 denominator: same as +0 case
+       ;; Finite x/0 denominator
        ((when (= v2 0))
         (let* ((special (if (= v1 0) :f64.nan
                           (if (> v1 0) :f64.+inf :f64.-inf)))
@@ -2589,8 +2814,8 @@
        (state (update-current-operand-stack ostack state)))
     (advance-instrs state)))
 
-(def-f64-binop execute-f64.min (min v1 v2))
-(def-f64-binop execute-f64.max (max v1 v2))
+(def-f64-binop-inf execute-f64.min (min v1 v2) f64-inf-min)
+(def-f64-binop-inf execute-f64.max (max v1 v2) f64-inf-max)
 
 ;; f64 unary
 (defun execute-f64.neg (state)
@@ -2761,10 +2986,7 @@
 
 ;; f64.copysign: magnitude of first arg, sign of second arg
 ;; IEEE 754: copysign(NaN, x) = NaN. Signed zeros and ±Inf handled correctly.
-(defun f64-sign-negativep (arg)
-  (declare (xargs :guard t :verify-guards nil))
-  (or (eq arg :f64.-0) (eq arg :f64.-inf)
-      (and (f64-valp arg) (< (farg1 arg) 0))))
+;; (f64-sign-negativep is defined in the Inf-arithmetic helpers section above)
 
 (defun execute-f64.copysign (state)
   (declare (xargs :guard (statep state) :verify-guards nil))
