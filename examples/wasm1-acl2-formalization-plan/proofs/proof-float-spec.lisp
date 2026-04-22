@@ -4,12 +4,10 @@
 ;; Under the rational model, float arithmetic is exact and corresponds
 ;; directly to ACL2's + and * on rationals.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *float-theory*
+(local (defconst *float-theory*
   '(run execute-instr
     execute-f64.const execute-f64.add execute-f64.mul
     execute-f32.const execute-f32.add
@@ -25,7 +23,7 @@
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
     valp i64-valp u32p u64p
-    step))
+    step)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: f64.add instruction specification
@@ -51,7 +49,7 @@
             :memory nil
             :globals nil))))
     (make-f64-val (+ a b))))
-  :hints (("Goal" :in-theory (enable . #.*float-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *float-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -79,7 +77,7 @@
             :memory nil
             :globals nil))))
     (make-f64-val (* a b))))
-  :hints (("Goal" :in-theory (enable . #.*float-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *float-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -107,10 +105,10 @@
             :memory nil
             :globals nil))))
     (make-f32-val (+ a b))))
-  :hints (("Goal" :in-theory (enable . #.*float-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *float-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~% - f64-add-spec: f64 addition (Q.E.D.)~%")
-(cw " - f64-mul-spec: f64 multiplication (Q.E.D.)~%")
-(cw " - f32-add-spec: f32 addition (Q.E.D.)~%")
+(value-triple (cw "~% - f64-add-spec: f64 addition (Q.E.D.)~%"))
+(value-triple (cw " - f64-mul-spec: f64 multiplication (Q.E.D.)~%"))
+(value-triple (cw " - f32-add-spec: f32 addition (Q.E.D.)~%"))

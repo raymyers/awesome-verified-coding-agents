@@ -2,10 +2,8 @@
 ;; Instruction format: (:block arity (body-list)), (:loop arity (body-list))
 ;;                     (:if arity (then-list) (else-list))
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Extract result from state or (:done state) — handles function return
 (defun get-result (r)
@@ -64,17 +62,17 @@
 (assert-event
  (equal (get-result (run 200 (make-gcd-state 48 18)))
         (make-i32-val 6)))
-(cw "~%PASS: gcd(48, 18) = 6~%")
+(value-triple (cw "~%PASS: gcd(48, 18) = 6~%"))
 
 (assert-event
  (equal (get-result (run 200 (make-gcd-state 35 14)))
         (make-i32-val 7)))
-(cw "PASS: gcd(35, 14) = 7~%")
+(value-triple (cw "PASS: gcd(35, 14) = 7~%"))
 
 (assert-event
  (equal (get-result (run 200 (make-gcd-state 1 1)))
         (make-i32-val 1)))
-(cw "PASS: gcd(1, 1) = 1~%")
+(value-triple (cw "PASS: gcd(1, 1) = 1~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 2. Sum of i32 array in memory
@@ -115,7 +113,7 @@
                 :memory (list 10 0 0 0  20 0 0 0  30 0 0 0  40 0 0 0  50 0 0 0)
                 :globals nil)))
         (make-i32-val 150)))
-(cw "PASS: sum_array([10,20,30,40,50]) = 150~%")
+(value-triple (cw "PASS: sum_array([10,20,30,40,50]) = 150~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 3. Memory swap: swap mem[0] and mem[4]
@@ -138,7 +136,7 @@
 
 (assert-event (equal (nth 0 (get-memory *swap-result*)) 99))
 (assert-event (equal (nth 4 (get-memory *swap-result*)) 42))
-(cw "PASS: swap(mem[0]=42, mem[4]=99) -> mem[0]=99, mem[4]=42~%")
+(value-triple (cw "PASS: swap(mem[0]=42, mem[4]=99) -> mem[0]=99, mem[4]=42~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 4. Absolute value via if/else + signed comparison
@@ -161,12 +159,12 @@
 (assert-event
  (equal (get-result (run 20 (make-abs-state 4294967291)))
         (make-i32-val 5)))
-(cw "PASS: abs(-5) = 5~%")
+(value-triple (cw "PASS: abs(-5) = 5~%"))
 
 (assert-event
  (equal (get-result (run 20 (make-abs-state 7)))
         (make-i32-val 7)))
-(cw "PASS: abs(7) = 7~%")
+(value-triple (cw "PASS: abs(7) = 7~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 5. djb2 hash: hash = 5381; hash = hash*33 + byte
@@ -195,7 +193,7 @@
                     :memory (list 72 105 0 0  0 0 0 0)
                     :globals nil)))
         (make-i32-val 5862390)))
-(cw "PASS: djb2_hash('Hi') = 5862390~%")
+(value-triple (cw "PASS: djb2_hash('Hi') = 5862390~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 6. Collatz sequence length
@@ -228,12 +226,12 @@
 (assert-event
  (equal (get-result (run 1000 (make-collatz-state 6)))
         (make-i32-val 8)))
-(cw "PASS: collatz(6) = 8 steps~%")
+(value-triple (cw "PASS: collatz(6) = 8 steps~%"))
 
 (assert-event
  (equal (get-result (run 10000 (make-collatz-state 27)))
         (make-i32-val 111)))
-(cw "PASS: collatz(27) = 111 steps~%")
+(value-triple (cw "PASS: collatz(27) = 111 steps~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 7. i64 overflow: 0xFFFFFFFF * 0xFFFFFFFF = 0xFFFFFFFE00000001
@@ -249,7 +247,7 @@
                                     :label-stack nil))
                   :memory nil :globals nil)))
         (make-i64-val 18446744065119617025)))
-(cw "PASS: i64 0xFFFFFFFF * 0xFFFFFFFF = 0xFFFFFFFE00000001~%")
+(value-triple (cw "PASS: i64 0xFFFFFFFF * 0xFFFFFFFF = 0xFFFFFFFE00000001~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 8. is_prime(n) by trial division
@@ -281,32 +279,32 @@
 (assert-event
  (equal (get-result (run 500 (make-prime-state 2)))
         (make-i32-val 1)))
-(cw "PASS: is_prime(2) = 1~%")
+(value-triple (cw "PASS: is_prime(2) = 1~%"))
 
 (assert-event
  (equal (get-result (run 500 (make-prime-state 7)))
         (make-i32-val 1)))
-(cw "PASS: is_prime(7) = 1~%")
+(value-triple (cw "PASS: is_prime(7) = 1~%"))
 
 (assert-event
  (equal (get-result (run 500 (make-prime-state 12)))
         (make-i32-val 0)))
-(cw "PASS: is_prime(12) = 0~%")
+(value-triple (cw "PASS: is_prime(12) = 0~%"))
 
 (assert-event
  (equal (get-result (run 500 (make-prime-state 97)))
         (make-i32-val 1)))
-(cw "PASS: is_prime(97) = 1~%")
+(value-triple (cw "PASS: is_prime(97) = 1~%"))
 
 (assert-event
  (equal (get-result (run 500 (make-prime-state 100)))
         (make-i32-val 0)))
-(cw "PASS: is_prime(100) = 0~%")
+(value-triple (cw "PASS: is_prime(100) = 0~%"))
 
 (assert-event
  (equal (get-result (run 500 (make-prime-state 1)))
         (make-i32-val 0)))
-(cw "PASS: is_prime(1) = 0~%")
+(value-triple (cw "PASS: is_prime(1) = 0~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(cw "~%=== ALL SPOT CHECKS PASSED ===~%")
+(value-triple (cw "~%=== ALL SPOT CHECKS PASSED ===~%"))

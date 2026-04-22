@@ -12,12 +12,9 @@
 ;; Representation: :f32.+0  :f32.-0  :f64.+0  :f64.-0  (float-specialp atoms)
 ;; Regular (:f32.const 0) is positive zero; neg((:f32.const 0)) = :f32.-0.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; ─── Inline state builder ──────────────────────────────────────────────────
 (defun f32-test-state (instrs)

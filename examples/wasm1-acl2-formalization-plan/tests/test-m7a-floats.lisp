@@ -1,10 +1,8 @@
 ;; WASM 1.0 ACL2 — Milestone 7a: f32/f64 floating-point tests
 ;; Tests: const, arithmetic, comparison, unary, conversion, promotion/demotion
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -218,4 +216,4 @@
  (equal (result-of (list '(:f64.const 7/4) '(:f32.demote_f64)))
         '(:f32.const 7/4)))
 
-(cw "~%All M7a float tests passed! (28 tests)~%")
+(value-triple (cw "~%All M7a float tests passed! (28 tests)~%"))

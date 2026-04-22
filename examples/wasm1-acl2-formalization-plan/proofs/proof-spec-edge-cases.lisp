@@ -6,12 +6,9 @@
 ;; bit counting, signed comparison boundaries, and conversions.
 ;; All expected values are oracle-derived — see TEST_GUIDELINES.md Rule 1.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; Helper: 1-frame state for inline instruction sequences
 (defund mk (instrs)
@@ -33,7 +30,7 @@
 (defconst *i32-neg7*   (- (expt 2 32) 7))   ; 4294967289 = -7 unsigned
 
 ;; Theory for unfolding inline instruction execution
-(defconst *edge-theory*
+(local (defconst *edge-theory*
   '(mk run step execute-instr
     execute-i32.const execute-i64.const
     execute-i32.div_s execute-i32.div_u execute-i32.rem_s execute-i32.rem_u
@@ -52,7 +49,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §1. TRAP CORRECTNESS
@@ -72,7 +69,7 @@
                            (list :i32.const *i32-neg1*)
                            '(:i32.div_s))))
          :trap)
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: div_s(1,0)=TRAP
 (defthm i32-div-s-zero-traps
@@ -80,7 +77,7 @@
                            '(:i32.const 0)
                            '(:i32.div_s))))
          :trap)
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: div_u(1,0)=TRAP
 (defthm i32-div-u-zero-traps
@@ -88,7 +85,7 @@
                            '(:i32.const 0)
                            '(:i32.div_u))))
          :trap)
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: rem_s(1,0)=TRAP
 (defthm i32-rem-s-zero-traps
@@ -96,7 +93,7 @@
                            '(:i32.const 0)
                            '(:i32.rem_s))))
          :trap)
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: rem_u(1,0)=TRAP
 (defthm i32-rem-u-zero-traps
@@ -104,7 +101,7 @@
                            '(:i32.const 0)
                            '(:i32.rem_u))))
          :trap)
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: rem_s(MIN,-1)=0  (NOT a trap — this is a notorious edge case)
 (defthm i32-rem-s-min-neg1-is-zero
@@ -114,7 +111,7 @@
                              (list :i32.const *i32-neg1*)
                              '(:i32.rem_s))))))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: div_s(-7,2)=-3  (truncation toward zero)
 ;; -7 unsigned = 4294967289, -3 unsigned = 4294967293
@@ -125,7 +122,7 @@
                              '(:i32.const 2)
                              '(:i32.div_s))))))
          (make-i32-val (- (expt 2 32) 3)))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: rem_s(-7,2)=-1  (sign follows dividend)
 ;; -1 unsigned = 4294967295
@@ -136,7 +133,7 @@
                              '(:i32.const 2)
                              '(:i32.rem_s))))))
          (make-i32-val *i32-neg1*))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: rem_u(7,2)=1
 (defthm i32-rem-u-basic
@@ -146,7 +143,7 @@
                              '(:i32.const 2)
                              '(:i32.rem_u))))))
          (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §2. SHIFT MODULAR SEMANTICS
@@ -162,7 +159,7 @@
                              '(:i32.const 31)
                              '(:i32.shl))))))
          (make-i32-val (expt 2 31)))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: shl(1,32)=1  (mod 32: shift by 0)
 (defthm i32-shl-mod-32-wraps
@@ -172,7 +169,7 @@
                              '(:i32.const 32)
                              '(:i32.shl))))))
          (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: shr_s(MIN,1)=-1073741824 unsigned=3221225472
 (defthm i32-shr-s-sign-extends
@@ -182,7 +179,7 @@
                              '(:i32.const 1)
                              '(:i32.shr_s))))))
          (make-i32-val 3221225472))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;; Oracle: shr_u(MIN,1)=1073741824
 (defthm i32-shr-u-zero-extends
@@ -192,7 +189,7 @@
                              '(:i32.const 1)
                              '(:i32.shr_u))))))
          (make-i32-val 1073741824))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §3. ROTATION
@@ -207,7 +204,7 @@
                              '(:i32.const 4)
                              '(:i32.rotl))))))
          (make-i32-val #xF000000F))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-rotr-boundary
   (equal (top-operand
@@ -216,7 +213,7 @@
                              '(:i32.const 4)
                              '(:i32.rotr))))))
          (make-i32-val #xF000000F))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §4. BIT COUNTING
@@ -230,63 +227,63 @@
           (current-operand-stack
            (run 2 (mk (list '(:i32.const 0) '(:i32.clz))))))
          (make-i32-val 32))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-clz-one
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list '(:i32.const 1) '(:i32.clz))))))
          (make-i32-val 31))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-clz-min
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list (list :i32.const *i32-min-s*) '(:i32.clz))))))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-ctz-zero
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list '(:i32.const 0) '(:i32.ctz))))))
          (make-i32-val 32))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-ctz-one
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list '(:i32.const 1) '(:i32.ctz))))))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-ctz-min
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list (list :i32.const *i32-min-s*) '(:i32.ctz))))))
          (make-i32-val 31))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-popcnt-zero
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list '(:i32.const 0) '(:i32.popcnt))))))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-popcnt-max
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list (list :i32.const *i32-neg1*) '(:i32.popcnt))))))
          (make-i32-val 32))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-popcnt-alternating
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list '(:i32.const #xAAAAAAAA) '(:i32.popcnt))))))
          (make-i32-val 16))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §5. SIGNED COMPARISON BOUNDARIES
@@ -302,7 +299,7 @@
                              '(:i32.const 0)
                              '(:i32.lt_s))))))
          (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-lt-s-zero-not-less-than-min
   (equal (top-operand
@@ -311,7 +308,7 @@
                              (list :i32.const *i32-min-s*)
                              '(:i32.lt_s))))))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-ge-s-max-ge-min
   (equal (top-operand
@@ -320,7 +317,7 @@
                              (list :i32.const *i32-min-s*)
                              '(:i32.ge_s))))))
          (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §6. CONVERSION EDGE CASES
@@ -335,28 +332,28 @@
           (current-operand-stack
            (run 2 (mk (list '(:i64.const #x100000001) '(:i32.wrap_i64))))))
          (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i32-wrap-all-ones
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list (list :i64.const (1- (expt 2 64))) '(:i32.wrap_i64))))))
          (make-i32-val *i32-neg1*))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i64-extend-s-neg1
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list (list :i32.const *i32-neg1*) '(:i64.extend_i32_s))))))
          (make-i64-val (1- (expt 2 64))))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 (defthm i64-extend-u-max
   (equal (top-operand
           (current-operand-stack
            (run 2 (mk (list (list :i32.const *i32-neg1*) '(:i64.extend_i32_u))))))
          (make-i64-val *i32-neg1*))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*))))
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §7. SYMBOLIC TRAP PROOF
@@ -372,7 +369,7 @@
                                     '(:i32.const 0)
                                     '(:i32.div_s))))
                   :trap))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 (defthm i32-div-u-any-by-zero-traps
@@ -381,7 +378,7 @@
                                     '(:i32.const 0)
                                     '(:i32.div_u))))
                   :trap))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 (defthm i32-rem-s-any-by-zero-traps
@@ -390,7 +387,7 @@
                                     '(:i32.const 0)
                                     '(:i32.rem_s))))
                   :trap))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 (defthm i32-rem-u-any-by-zero-traps
@@ -399,7 +396,7 @@
                                     '(:i32.const 0)
                                     '(:i32.rem_u))))
                   :trap))
-  :hints (("Goal" :in-theory (enable . #.*edge-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *edge-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; All done — no FAILED if this file loads cleanly.

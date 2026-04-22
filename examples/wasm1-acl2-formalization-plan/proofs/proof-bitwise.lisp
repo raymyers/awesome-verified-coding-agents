@@ -8,13 +8,11 @@
 ;; These lift BV library theorems (bvxor-same, bvand-same, bvor-of-0-arg3)
 ;; to the WASM instruction execution level, proving semantic correctness.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;;; Common theory for WASM instruction unfolding
-(defconst *wasm-binop-theory*
+(local (defconst *wasm-binop-theory*
   '(run execute-instr execute-i32.const
     execute-i32.xor execute-i32.and execute-i32.or
     current-frame current-instrs current-operand-stack
@@ -26,7 +24,7 @@
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack
     call-stackp valp i64-valp u32p u64p
-    farg1))
+    farg1)))
 
 ;;; Helper: make a standard 3-instruction WASM state
 (defun make-binop-state (a b op)
@@ -131,7 +129,7 @@
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~%=== ALL BITWISE PROPERTY PROOFS PASSED ===~%")
-(cw "  - i32-xor-self-zero: Q.E.D.~%")
-(cw "  - i32-and-idempotent: Q.E.D.~%")
-(cw "  - i32-or-zero-identity: Q.E.D.~%")
+(value-triple (cw "~%=== ALL BITWISE PROPERTY PROOFS PASSED ===~%"))
+(value-triple (cw "  - i32-xor-self-zero: Q.E.D.~%"))
+(value-triple (cw "  - i32-and-idempotent: Q.E.D.~%"))
+(value-triple (cw "  - i32-or-zero-identity: Q.E.D.~%"))

@@ -5,12 +5,10 @@
 ;;
 ;; Oracle: Node.js running compiled WAT (see tests/oracle/float_ops.wat)
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *m11-theory*
+(local (defconst *m11-theory*
   '(run execute-instr step
     execute-f32.const execute-f64.const
     execute-f32.trunc execute-f64.trunc
@@ -32,7 +30,7 @@
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
     valp u32p u64p
-    update-memory))
+    update-memory)))
 
 ;; Helper: make a 1-frame state with given instructions
 (defund mk-state (instrs)

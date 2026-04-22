@@ -13,10 +13,8 @@
 ;;   - Omit instrp from theory (150+ cases, not needed with :verify-guards nil)
 ;;   - Combine via :use instances
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; The max(a,b) program:
 ;;   local.get 0           ; push a
@@ -49,7 +47,7 @@
 
 ;; Theory for if/else proofs: execution functions + label stack ops
 ;; Note: instrp intentionally omitted (150+ instruction cases cause rewrite explosion)
-(defconst *max-theory*
+(local (defconst *max-theory*
   '(run execute-instr
     execute-local.get execute-i32.gt_u execute-if
     complete-label return-from-function
@@ -65,7 +63,7 @@
     valp i64-valp u32p u64p val-listp
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
-    nth-local make-max-state))
+    nth-local make-max-state)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: When a > b, the program returns a
@@ -80,7 +78,7 @@
      (current-operand-stack
       (run 6 (make-max-state a b))))
     (make-i32-val a)))
-  :hints (("Goal" :in-theory (enable . #.*max-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *max-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -99,7 +97,7 @@
      (current-operand-stack
       (run 6 (make-max-state a b))))
     (make-i32-val b)))
-  :hints (("Goal" :in-theory (enable . #.*max-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *max-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -122,6 +120,6 @@
                   :in-theory (disable max-when-a-greater max-when-b-geq
                                       make-max-state run))))
 
-(cw "~% - max-when-a-greater: a > b → returns a (Q.E.D.)~%")
-(cw " - max-when-b-geq: a <= b → returns b (Q.E.D.)~%")
-(cw " - max-if-else-correct: combined max theorem (Q.E.D.)~%")
+(value-triple (cw "~% - max-when-a-greater: a > b → returns a (Q.E.D.)~%"))
+(value-triple (cw " - max-when-b-geq: a <= b → returns b (Q.E.D.)~%"))
+(value-triple (cw " - max-if-else-correct: combined max theorem (Q.E.D.)~%"))

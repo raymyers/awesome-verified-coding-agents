@@ -1,0 +1,2 @@
+; Portcullis commands for books under proofs/.
+(include-book "kestrel/wasm/portcullis" :dir :system)

@@ -11,10 +11,8 @@
 ;; 4. return inside block produces :done (early exit)
 ;; 5. return skips unreachable code (i32.const 99 never reached)
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; abs(x) program: if (x <_s 0) then (0 - x) else x
 (defconst *abs-instrs*
@@ -37,7 +35,7 @@
     :memory nil
     :globals nil))
 
-(defconst *abs-theory*
+(local (defconst *abs-theory*
   '(run execute-instr
     execute-i32.const execute-i32.sub execute-i32.lt_s
     execute-local.get execute-if
@@ -55,7 +53,7 @@
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
     label-stackp nth-label pop-n-labels
-    nth-local))
+    nth-local)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: abs(0) = 0
@@ -68,7 +66,7 @@
     (current-operand-stack
      (run 6 (abs-state 0))))
    (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*abs-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *abs-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -84,7 +82,7 @@
     (current-operand-stack
      (run 6 (abs-state 7))))
    (make-i32-val 7))
-  :hints (("Goal" :in-theory (enable . #.*abs-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *abs-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -103,7 +101,7 @@
     (current-operand-stack
      (run 8 (abs-state 4294967291)))) ;; -5 as u32
    (make-i32-val 5))
-  :hints (("Goal" :in-theory (enable . #.*abs-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *abs-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -115,7 +113,7 @@
 ;; return inside a block exits the entire function.
 ;; Code after return is dead code (never executed).
 
-(defconst *return-theory*
+(local (defconst *return-theory*
   '(run execute-instr execute-i32.const execute-block
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -130,7 +128,7 @@
     valp i64-valp u32p u64p val-listp
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
-    label-stackp nth-label pop-n-labels))
+    label-stackp nth-label pop-n-labels)))
 
 ;; Theorem 4: return inside block produces :done (function exits)
 (defthm return-exits-block-early
@@ -149,7 +147,7 @@
                            :label-stack nil))
          :memory nil
          :globals nil)))
-  :hints (("Goal" :in-theory (enable . #.*return-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *return-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -174,15 +172,15 @@
               :memory nil
               :globals nil)))
    :done)
-  :hints (("Goal" :in-theory (enable . #.*return-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *return-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
                            (:free (n s) (pop-n-labels n s))
                            (:free (v s) (push-vals v s))))))
 
-(cw "~% - abs-of-zero: abs(0)=0 (Q.E.D.)~%")
-(cw " - abs-of-positive: abs(7)=7 (Q.E.D.)~%")
-(cw " - abs-of-negative: abs(-5)=5 via 2's complement (Q.E.D.)~%")
-(cw " - return-exits-block-early: return produces :done (Q.E.D.)~%")
-(cw " - return-skips-unreachable-code: dead code skipped (Q.E.D.)~%")
+(value-triple (cw "~% - abs-of-zero: abs(0)=0 (Q.E.D.)~%"))
+(value-triple (cw " - abs-of-positive: abs(7)=7 (Q.E.D.)~%"))
+(value-triple (cw " - abs-of-negative: abs(-5)=5 via 2's complement (Q.E.D.)~%"))
+(value-triple (cw " - return-exits-block-early: return produces :done (Q.E.D.)~%"))
+(value-triple (cw " - return-skips-unreachable-code: dead code skipped (Q.E.D.)~%"))

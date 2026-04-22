@@ -1,7 +1,5 @@
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 (defun get-result (r)
   (declare (xargs :guard t :verify-guards nil))
@@ -125,4 +123,4 @@
               '((:i64.const 10000000000) (:i64.const 5000000000) (:i64.add) (:i32.wrap_i64))
               (make-i32-val (acl2::bvchop 32 15000000000)))
 
-(cw "~%All M5 tests passed! (i64 ops + conversions + i64 memory)~%")
+(value-triple (cw "~%All M5 tests passed! (i64 ops + conversions + i64 memory)~%"))

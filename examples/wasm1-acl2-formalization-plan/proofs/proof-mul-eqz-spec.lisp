@@ -5,12 +5,10 @@
 ;; 3. i32-eqz-of-zero: eqz(0) = 1
 ;; 4. i32-eqz-of-nonzero: eqz(x) = 0 when x != 0
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *wasm-exec-theory*
+(local (defconst *wasm-exec-theory*
   '(run execute-instr execute-i32.const
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -20,7 +18,7 @@
     push-operand top-operand pop-operand top-n-operands
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack
-    call-stackp valp i64-valp u32p u64p))
+    call-stackp valp i64-valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: i32.mul specification
@@ -46,7 +44,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val (acl2::bvmult 32 a b))))
-  :hints (("Goal" :in-theory (enable execute-i32.mul . #.*wasm-exec-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i32.mul) *wasm-exec-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -73,7 +71,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable execute-i32.mul . #.*wasm-exec-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i32.mul) *wasm-exec-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -96,7 +94,7 @@
            :memory nil
            :globals nil))))
    (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable execute-i32.eqz . #.*wasm-exec-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i32.eqz) *wasm-exec-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -122,12 +120,12 @@
             :memory nil
             :globals nil))))
     (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable execute-i32.eqz . #.*wasm-exec-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i32.eqz) *wasm-exec-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~%All mul/eqz proofs passed!~%")
-(cw "  - i32-mul-spec: multiplication specification (Q.E.D.)~%")
-(cw "  - i32-mul-by-zero: x * 0 = 0 (Q.E.D.)~%")
-(cw "  - i32-eqz-of-zero: eqz(0) = 1 (Q.E.D.)~%")
-(cw "  - i32-eqz-of-nonzero: eqz(x!=0) = 0 (Q.E.D.)~%")
+(value-triple (cw "~%All mul/eqz proofs passed!~%"))
+(value-triple (cw "  - i32-mul-spec: multiplication specification (Q.E.D.)~%"))
+(value-triple (cw "  - i32-mul-by-zero: x * 0 = 0 (Q.E.D.)~%"))
+(value-triple (cw "  - i32-eqz-of-zero: eqz(0) = 1 (Q.E.D.)~%"))
+(value-triple (cw "  - i32-eqz-of-nonzero: eqz(x!=0) = 0 (Q.E.D.)~%"))

@@ -7,13 +7,11 @@
 ;; These are the first proofs involving the label stack lifecycle
 ;; (push on block entry, pop on block completion or br).
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Theory for block/branch proofs: includes label stack operations
-(defconst *block-theory*
+(local (defconst *block-theory*
   '(run execute-instr execute-i32.const execute-block
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -28,7 +26,7 @@
     valp i64-valp u32p u64p val-listp
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
-    label-stackp nth-label pop-n-labels))
+    label-stackp nth-label pop-n-labels)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: Block passes through result
@@ -54,7 +52,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val v)))
-  :hints (("Goal" :in-theory (enable . #.*block-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *block-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -89,12 +87,12 @@
             :memory nil
             :globals nil))))
     (make-i32-val b)))
-  :hints (("Goal" :in-theory (enable . #.*block-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *block-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
                            (:free (n s) (pop-n-labels n s))
                            (:free (v s) (push-vals v s))))))
 
-(cw "~% - block-passes-result: block label lifecycle (Q.E.D.)~%")
-(cw " - br-exits-block: br 0 unwinds to enclosing block (Q.E.D.)~%")
+(value-triple (cw "~% - block-passes-result: block label lifecycle (Q.E.D.)~%"))
+(value-triple (cw " - br-exits-block: br 0 unwinds to enclosing block (Q.E.D.)~%"))

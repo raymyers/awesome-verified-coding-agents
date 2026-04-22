@@ -7,10 +7,8 @@
 ;; These establish that table dispatch is correct and safe: valid entries
 ;; resolve to the right function, and invalid entries always trap.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: call_indirect with valid table entry delegates to execute-call
@@ -129,7 +127,7 @@
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~%All call_indirect proofs passed!~%")
-(cw "  - call_indirect-delegates-to-call: table dispatch correctness (Q.E.D.)~%")
-(cw "  - call_indirect-oob-traps: out-of-bounds trap (Q.E.D.)~%")
-(cw "  - call_indirect-nil-entry-traps: uninitialized entry trap (Q.E.D.)~%")
+(value-triple (cw "~%All call_indirect proofs passed!~%"))
+(value-triple (cw "  - call_indirect-delegates-to-call: table dispatch correctness (Q.E.D.)~%"))
+(value-triple (cw "  - call_indirect-oob-traps: out-of-bounds trap (Q.E.D.)~%"))
+(value-triple (cw "  - call_indirect-nil-entry-traps: uninitialized entry trap (Q.E.D.)~%"))

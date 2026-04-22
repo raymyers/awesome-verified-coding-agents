@@ -11,10 +11,8 @@
 ;; The type stack is a list of value type keywords (:i32 :i64 :f32 :f64).
 ;; :polymorphic marks unreachable code (after br, return, unreachable).
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "execution")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 9.1 Value types and validation context
@@ -593,4 +591,4 @@
       (or (equal body-result '(:polymorphic))
           (equal body-result result-type)))))
 
-(cw "~%validation.lisp loaded successfully~%")
+(value-triple (cw "~%validation.lisp loaded successfully~%"))

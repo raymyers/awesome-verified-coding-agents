@@ -1,7 +1,5 @@
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Helper with label-stack support
 (defmacro run-wasm (steps locals instrs)
@@ -105,4 +103,4 @@
                 (:local.get 1))
               (make-i32-val 120))
 
-(cw "~%All M2 tests passed! (including factorial(5)=120)~%")
+(value-triple (cw "~%All M2 tests passed! (including factorial(5)=120)~%"))

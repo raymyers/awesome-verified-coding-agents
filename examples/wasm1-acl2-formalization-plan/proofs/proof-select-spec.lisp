@@ -6,12 +6,10 @@
 ;; The select instruction is WASM's ternary operator:
 ;; (i32.const a) (i32.const b) (i32.const c) select → a if c≠0, else b
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *wasm-exec-theory*
+(local (defconst *wasm-exec-theory*
   '(run execute-instr execute-i32.const execute-select
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -21,7 +19,7 @@
     push-operand top-operand pop-operand top-n-operands
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack
-    call-stackp valp i64-valp u32p u64p))
+    call-stackp valp i64-valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: select with non-zero condition returns first value (val1)
@@ -50,7 +48,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val a)))
-  :hints (("Goal" :in-theory (enable . #.*wasm-exec-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *wasm-exec-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -79,10 +77,10 @@
             :memory nil
             :globals nil))))
     (make-i32-val b)))
-  :hints (("Goal" :in-theory (enable . #.*wasm-exec-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *wasm-exec-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~%All select proofs passed!~%")
-(cw "  - select-nonzero-returns-first: c!=0 -> val1 (Q.E.D.)~%")
-(cw "  - select-zero-returns-second: c==0 -> val2 (Q.E.D.)~%")
+(value-triple (cw "~%All select proofs passed!~%"))
+(value-triple (cw "  - select-nonzero-returns-first: c!=0 -> val1 (Q.E.D.)~%"))
+(value-triple (cw "  - select-zero-returns-second: c==0 -> val2 (Q.E.D.)~%"))

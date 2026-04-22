@@ -16,13 +16,11 @@
 ;;   9.  f32-zero-div-zero-is-nan : f32.div(0, 0) = NaN
 ;;   10. f32-pos-div-zero-is-inf  : f32.div(x, 0) for x>0 = +Inf
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Theory for float op proofs — includes all needed defund functions
-(defconst *nan-theory*
+(local (defconst *nan-theory*
   '(run execute-instr step
     execute-f32.const execute-f32.add execute-f32.mul execute-f32.sub
     execute-f32.eq execute-f32.ne execute-f32.lt execute-f32.div
@@ -39,7 +37,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    u32p u64p))
+    u32p u64p)))
 
 ;; Helper: build a 1-frame state with NaN on top of stack and one finite value below
 (defund make-nan-add-state (tag other-val instrs)
@@ -67,7 +65,7 @@
       (run 1 (make-nan-add-state :f32.nan x '((:f32.add))))))
     :f32.nan))
   :hints (("Goal"
-           :in-theory (enable make-nan-add-state . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) (append '(make-nan-add-state) *nan-theory*))
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -82,7 +80,7 @@
       (run 1 (make-nan-add-state :f32.nan x '((:f32.mul))))))
     :f32.nan))
   :hints (("Goal"
-           :in-theory (enable make-nan-add-state . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) (append '(make-nan-add-state) *nan-theory*))
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -97,7 +95,7 @@
       (run 1 (make-nan-add-state :f32.nan x '((:f32.sub))))))
     :f32.nan))
   :hints (("Goal"
-           :in-theory (enable make-nan-add-state . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) (append '(make-nan-add-state) *nan-theory*))
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -121,7 +119,7 @@
              :globals nil))))
    '(:i32.const 0))
   :hints (("Goal"
-           :in-theory (enable . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) *nan-theory*)
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -145,7 +143,7 @@
              :globals nil))))
    '(:i32.const 1))
   :hints (("Goal"
-           :in-theory (enable . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) *nan-theory*)
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -160,7 +158,7 @@
       (run 1 (make-nan-add-state :f32.nan x '((:f32.lt))))))
     '(:i32.const 0)))
   :hints (("Goal"
-           :in-theory (enable make-nan-add-state . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) (append '(make-nan-add-state) *nan-theory*))
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -188,7 +186,7 @@
       (run 1 (make-nan-add-state64 :f64.nan x '((:f64.add))))))
     :f64.nan))
   :hints (("Goal"
-           :in-theory (enable make-nan-add-state64 . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) (append '(make-nan-add-state64) *nan-theory*))
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -203,7 +201,7 @@
       (run 1 (make-nan-add-state64 :f64.nan x '((:f64.mul))))))
     :f64.nan))
   :hints (("Goal"
-           :in-theory (enable make-nan-add-state64 . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) (append '(make-nan-add-state64) *nan-theory*))
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -227,7 +225,7 @@
              :globals nil))))
    :f32.nan)
   :hints (("Goal"
-           :in-theory (enable . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) *nan-theory*)
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
@@ -252,17 +250,17 @@
               :globals nil))))
     :f32.+inf))
   :hints (("Goal"
-           :in-theory (enable make-f32-val . #.*nan-theory*)
+           :in-theory (union-theories (current-theory :here) (append '(make-f32-val) *nan-theory*))
            :do-not '(generalize)
            :expand ((:free (n s) (run n s))))))
 
-(cw "~% - f32-nan-propagates-add: f32.add(NaN, x) = NaN (Q.E.D.)~%")
-(cw " - f32-nan-propagates-mul: f32.mul(NaN, x) = NaN (Q.E.D.)~%")
-(cw " - f32-nan-propagates-sub: f32.sub(NaN, x) = NaN (Q.E.D.)~%")
-(cw " - f32-eq-nan-is-zero:     f32.eq(NaN, NaN) = 0 (Q.E.D.)~%")
-(cw " - f32-ne-nan-is-one:      f32.ne(NaN, NaN) = 1 (Q.E.D.)~%")
-(cw " - f32-lt-nan-is-zero:     f32.lt(NaN, x)   = 0 (Q.E.D.)~%")
-(cw " - f64-nan-propagates-add: f64.add(NaN, x) = NaN (Q.E.D.)~%")
-(cw " - f64-nan-propagates-mul: f64.mul(NaN, x) = NaN (Q.E.D.)~%")
-(cw " - f32-zero-div-zero-is-nan: f32.div(0,0) = NaN (Q.E.D.)~%")
-(cw " - f32-pos-div-zero-is-inf:  f32.div(x>0,0) = +Inf (Q.E.D.)~%")
+(value-triple (cw "~% - f32-nan-propagates-add: f32.add(NaN, x) = NaN (Q.E.D.)~%"))
+(value-triple (cw " - f32-nan-propagates-mul: f32.mul(NaN, x) = NaN (Q.E.D.)~%"))
+(value-triple (cw " - f32-nan-propagates-sub: f32.sub(NaN, x) = NaN (Q.E.D.)~%"))
+(value-triple (cw " - f32-eq-nan-is-zero:     f32.eq(NaN, NaN) = 0 (Q.E.D.)~%"))
+(value-triple (cw " - f32-ne-nan-is-one:      f32.ne(NaN, NaN) = 1 (Q.E.D.)~%"))
+(value-triple (cw " - f32-lt-nan-is-zero:     f32.lt(NaN, x)   = 0 (Q.E.D.)~%"))
+(value-triple (cw " - f64-nan-propagates-add: f64.add(NaN, x) = NaN (Q.E.D.)~%"))
+(value-triple (cw " - f64-nan-propagates-mul: f64.mul(NaN, x) = NaN (Q.E.D.)~%"))
+(value-triple (cw " - f32-zero-div-zero-is-nan: f32.div(0,0) = NaN (Q.E.D.)~%"))
+(value-triple (cw " - f32-pos-div-zero-is-inf:  f32.div(x>0,0) = +Inf (Q.E.D.)~%"))

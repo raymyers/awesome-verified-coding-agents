@@ -13,12 +13,9 @@
 ;;
 ;; Stack representation: :f32.+inf :f32.-inf :f64.+inf :f64.-inf atoms.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; ─── Helper: run one binary instruction with two pre-loaded special operands ──
 ;;
@@ -206,4 +203,4 @@
  (equal (ia-top (make-f32-val 3) (make-f32-val 4) '(:f32.max))
         (make-f32-val 4)))
 
-(cw "~%*** M14 Inf arithmetic: all assertions passed ***~%")
+(value-triple (cw "~%*** M14 Inf arithmetic: all assertions passed ***~%"))

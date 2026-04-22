@@ -1,9 +1,7 @@
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *test-store*
+(local (defconst *test-store*
   (list
    ;; func 0: add(a,b) = a + b
    (make-funcinst :param-count 2 :local-count 0 :return-arity 1
@@ -39,7 +37,7 @@
                                 (:i32.const 2)
                                 (:i32.sub)
                                 (:call 3)
-                                (:i32.add)))))))
+                                (:i32.add))))))))
 
 (defmacro run-wasm-store (steps store locals instrs)
   `(run ,steps
@@ -98,4 +96,4 @@
                  '((:i32.const 7) (:call 3))
                  (make-i32-val 13))
 
-(cw "~%All M3 tests passed! (recursive factorial+fibonacci via call)~%")
+(value-triple (cw "~%All M3 tests passed! (recursive factorial+fibonacci via call)~%"))

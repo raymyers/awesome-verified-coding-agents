@@ -16,12 +16,9 @@
 ;;   neg(NaN) = NaN        abs(NaN) = NaN
 ;;   neg(+Inf) = -Inf      abs(-Inf) = +Inf
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -321,11 +318,11 @@
         :f32.nan)
  :msg "FAIL: NaN-1-1-1 should = NaN (3-hop chain)")
 
-(cw "~% === M12 NaN/Inf tests: ALL PASSED ===~%")
-(cw " - NaN propagation: f32.add, f32.mul, f32.sub (Oracle: NaN+5=NaN etc.)~%")
-(cw " - NaN comparisons: f32.eq=0, f32.lt=0, f32.ne=1 (IEEE 754 unordered)~%")
-(cw " - Division: 0/0=NaN, 1/0=+Inf, -5/0=-Inf (IEEE 754 Section 6.2)~%")
-(cw " - sqrt: sqrt(-1)=NaN (IEEE 754), sqrt(4)=4 (finite still works)~%")
-(cw " - Unary: neg(NaN)=NaN, neg(+Inf)=-Inf, abs(-Inf)=+Inf~%")
-(cw " - f64 NaN: same propagation as f32~%")
-(cw " - NaN chains: (NaN+5)*3=NaN (transitive propagation)~%")
+(value-triple (cw "~% === M12 NaN/Inf tests: ALL PASSED ===~%"))
+(value-triple (cw " - NaN propagation: f32.add, f32.mul, f32.sub (Oracle: NaN+5=NaN etc.)~%"))
+(value-triple (cw " - NaN comparisons: f32.eq=0, f32.lt=0, f32.ne=1 (IEEE 754 unordered)~%"))
+(value-triple (cw " - Division: 0/0=NaN, 1/0=+Inf, -5/0=-Inf (IEEE 754 Section 6.2)~%"))
+(value-triple (cw " - sqrt: sqrt(-1)=NaN (IEEE 754), sqrt(4)=4 (finite still works)~%"))
+(value-triple (cw " - Unary: neg(NaN)=NaN, neg(+Inf)=-Inf, abs(-Inf)=+Inf~%"))
+(value-triple (cw " - f64 NaN: same propagation as f32~%"))
+(value-triple (cw " - NaN chains: (NaN+5)*3=NaN (transitive propagation)~%"))

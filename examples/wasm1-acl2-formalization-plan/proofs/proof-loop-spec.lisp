@@ -8,12 +8,10 @@
 ;; These prove the complete loop lifecycle: enter, re-enter (br_if true),
 ;; and exit (br_if false with label completion).
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *loop-theory*
+(local (defconst *loop-theory*
   '(run execute-instr execute-i32.const execute-loop
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -28,7 +26,7 @@
     valp i64-valp u32p u64p val-listp
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
-    label-stackp nth-label pop-n-labels))
+    label-stackp nth-label pop-n-labels)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem: Loop exits when br_if condition is false
@@ -67,7 +65,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val v)))
-  :hints (("Goal" :in-theory (enable . #.*loop-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *loop-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -76,7 +74,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extended theory for multi-iteration loop proofs
 
-(defconst *loop-full-theory*
+(local (defconst *loop-full-theory*
   '(run execute-instr
     execute-i32.const execute-i32.add execute-i32.sub
     execute-loop execute-local.get execute-local.set execute-local.tee
@@ -94,7 +92,7 @@
     label-entryp label-entry->arity label-entry->continuation
     label-entry->is-loop push-label pop-label top-label
     label-stackp nth-label pop-n-labels
-    nth-local update-nth-local))
+    nth-local update-nth-local)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 2: Countdown loop (2 iterations)
@@ -132,7 +130,7 @@
            :memory nil
            :globals nil))))
    (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*loop-full-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *loop-full-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
@@ -176,13 +174,13 @@
            :memory nil
            :globals nil))))
    (make-i32-val 6))
-  :hints (("Goal" :in-theory (enable . #.*loop-full-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *loop-full-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))
                            (:free (n s a) (top-n-operands n s a))
                            (:free (n s) (pop-n-labels n s))
                            (:free (v s) (push-vals v s))))))
 
-(cw "~% - loop-exits-on-false-condition: br_if exit mechanism (Q.E.D.)~%")
-(cw " - countdown-loop-2-reaches-zero: 2-iter countdown (Q.E.D.)~%")
-(cw " - sum-loop-3-equals-6: 3-iter accumulator sum(1..3)=6 (Q.E.D.)~%")
+(value-triple (cw "~% - loop-exits-on-false-condition: br_if exit mechanism (Q.E.D.)~%"))
+(value-triple (cw " - countdown-loop-2-reaches-zero: 2-iter countdown (Q.E.D.)~%"))
+(value-triple (cw " - sum-loop-3-equals-6: 3-iter accumulator sum(1..3)=6 (Q.E.D.)~%"))

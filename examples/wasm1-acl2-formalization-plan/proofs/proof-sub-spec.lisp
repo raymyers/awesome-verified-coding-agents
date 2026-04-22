@@ -1,7 +1,5 @@
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 (include-book "kestrel/bv/bvuminus" :dir :system)
 
 ;; Theorem 3: i32.sub specification
@@ -128,7 +126,7 @@
                   :do-not (quote (generalize))
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~%=== ALL 3 NEW PROOFS PASSED ===~%")
-(cw "  3. i32-sub-spec: sub specification (Q.E.D.)~%")
-(cw "  4. i32-sub-self-is-zero: x - x = 0 (Q.E.D.)~%")
-(cw "  5. i32-add-sub-inverse: (a + b) - b = a (Q.E.D.)~%")
+(value-triple (cw "~%=== ALL 3 NEW PROOFS PASSED ===~%"))
+(value-triple (cw "  3. i32-sub-spec: sub specification (Q.E.D.)~%"))
+(value-triple (cw "  4. i32-sub-self-is-zero: x - x = 0 (Q.E.D.)~%"))
+(value-triple (cw "  5. i32-add-sub-inverse: (a + b) - b = a (Q.E.D.)~%"))
