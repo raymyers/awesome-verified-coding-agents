@@ -1,6 +1,6 @@
 # Certify all books in this directory with cert.pl.
 #
-#   ACL2  - path to the ACL2 image (default: /home/acl2/saved_acl2)
+#   ACL2  - path to the ACL2 image (default: $ACL2 env var, or /opt/acl2/bin/acl2)
 #   CERT  - path to books/build/cert.pl (default: /home/acl2/books/build/cert.pl)
 #   JOBS  - parallelism for cert.pl -j (default: 4)
 #
@@ -11,7 +11,7 @@
 #   make tests       # certify every tests/*.lisp book
 #   make clean       # remove .cert and related build artifacts
 
-ACL2 ?= /home/acl2/saved_acl2
+ACL2 ?= /opt/acl2/bin/acl2
 CERT ?= /home/acl2/books/build/cert.pl
 JOBS ?= 4
 

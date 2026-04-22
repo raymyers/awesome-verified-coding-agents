@@ -18,40 +18,50 @@ Subdir: `examples/wasm1-acl2-formalization-plan/`
 ## Key Files
 - `WASM1_PLAN.md` — Milestone plan with task bullets, MVP strategy, testing plan
 - `ACL2_SEMANTICS_REF.md` — SpecTec → ACL2 mapping, build commands, patterns, references
-- `execution.lisp` — Main semantics (canonical copy, also in src/)
+- `execution.lisp` — Main semantics (3718 lines)
+- `validation.lisp` — Type checker
+- `top.lisp` — Library bundle: `(include-book "top")` → execution + validation
+- `cert.acl2` / `proofs/cert.acl2` / `tests/cert.acl2` — per-dir portcullis, all just `(include-book "kestrel/wasm/portcullis" :dir :system)`
+- `Makefile` — drives `cert.pl` over all 45 books
 - `proofs/proof-spec-edge-cases.lisp` — 35 Q.E.D.s: trap, shift, rotate, clz/ctz, conversion edge cases
 - `proofs/proof-algebraic-properties.lisp` — 27 Q.E.D.s: identity, annihilator, reflexivity properties
 - `proofs/proof-add-spec.lisp` — Add spec + commutativity (2 theorems)
 - `proofs/proof-sub-spec.lisp` — Sub spec + self-zero + add-sub-inverse (3 theorems)
 - `tests/test-spot-check.lisp` — 20 ground-truth tests
 - `tests/test-packed-mem.lisp` — 10 packed memory tests
-- `tests/oracle/check-all.sh` — Oracle pipeline (compile WAT → run Node.js)
+- `tests/oracle/check-all.sh` — Oracle pipeline (compile WAT → run Node.js). Directory contains `cert_pl_exclude` so cert.pl skips it.
 
 ## ACL2 Build
 ```bash
+# The provided dev container already has ACL2 installed. Env vars set by
+# .devcontainer/devcontainer.json:
+#   ACL2=/opt/acl2/bin/acl2                (also on $PATH as `acl2`)
+#   ACL2_HOME=/home/acl2
+#   ACL2_SYSTEM_BOOKS=/home/acl2/books
+# For a fresh machine, build from source:
 sudo apt-get install -y sbcl
-git clone --depth 1 https://github.com/acl2/acl2.git /tmp/acl2-full
-cd /tmp/acl2-full && make LISP=sbcl
-export ACL2=/tmp/acl2-full/saved_acl2
+git clone --depth 1 https://github.com/acl2/acl2.git $HOME/acl2
+cd $HOME/acl2 && make LISP=sbcl
+export ACL2=$HOME/acl2/saved_acl2
+export CERT=$HOME/acl2/books/build/cert.pl
 ```
 
-## Certify Execution Book
+## Certify Everything
 ```bash
-# Copy our execution.lisp over the skeleton:
-cp execution.lisp /tmp/acl2-full/books/kestrel/wasm/execution.lisp
-# Certify with cert.pl (NOT bare make):
-cd /tmp/acl2-full && books/build/cert.pl --acl2 ./saved_acl2 books/kestrel/wasm/execution
+cd examples/wasm1-acl2-formalization-plan
+make clean && make          # certifies all 45 books (top + 27 proofs + 15 tests + library)
+make top                    # just execution + validation + top
+make proofs                 # just proofs/*.lisp
+make tests                  # just tests/*.lisp
+# Single book:
+$CERT --acl2 $ACL2 proofs/proof-add-spec
 ```
-**CRITICAL**: Don't use `make -C books/kestrel/wasm` (no Makefile there). Use `cert.pl`.
+**The WASM package comes from the community book `kestrel/wasm/portcullis`, pulled in via each `cert.acl2`. There is no local `package.lsp`.**
 
 ## Run Tests
+Certification IS the regression — every `assert-event` in a test book is checked during `make`. For one-off interactive debugging you can still `ld`:
 ```bash
-# Spot-check tests
-echo '(ld "books/kestrel/wasm/test-spot-check.lisp") (quit)' | $ACL2
-# Packed memory tests
-echo '(ld "/tmp/test-packed-mem.lisp") (quit)' | $ACL2
-# Proofs
-echo '(ld "path/to/proof-sub-spec.lisp") (quit)' | $ACL2
+echo '(include-book "tests/test-spot-check") (quit)' | $ACL2
 # Oracle (needs wabt + node)
 cd tests/oracle && bash check-all.sh
 ```
