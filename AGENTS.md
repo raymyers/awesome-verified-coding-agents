@@ -31,6 +31,10 @@ Subdir: `examples/wasm1-acl2-formalization-plan/`
 - `tests/test-packed-mem.lisp` — 10 packed memory tests
 - `tests/oracle/check-all.sh` — Oracle pipeline (compile WAT → run Node.js). Directory contains `cert_pl_exclude` so cert.pl skips it.
 
+## Standalone Repo
+The formalization now lives at **https://github.com/raymyers/wasm-acl2** (main branch).
+The `examples/wasm1-acl2-formalization-plan/` subdir of this repo stays in sync via PR diffs.
+
 ## ACL2 Build
 ```bash
 # The provided dev container already has ACL2 installed. Env vars set by
@@ -57,6 +61,15 @@ make tests                  # just tests/*.lisp
 $CERT --acl2 $ACL2 proofs/proof-add-spec
 ```
 **The WASM package comes from the community book `kestrel/wasm/portcullis`, pulled in via each `cert.acl2`. There is no local `package.lsp`.**
+All 45 books return `Exit code from ACL2 is 43` on success.
+
+## Propagating Changes → wasm-acl2 Standalone Repo
+```bash
+# Diff the formalization subdir between two commits:
+git diff <base-sha> <head-sha> -- examples/wasm1-acl2-formalization-plan/ > /tmp/patch.patch
+# Apply to wasm-acl2 (strip 3 path components: a/examples/wasm1-acl2-formalization-plan/):
+cd /path/to/wasm-acl2 && git apply -p3 /tmp/patch.patch
+```
 
 ## Run Tests
 Certification IS the regression — every `assert-event` in a test book is checked during `make`. For one-off interactive debugging you can still `ld`:
