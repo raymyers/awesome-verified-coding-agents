@@ -7,13 +7,11 @@
 ;; 4. i32.wrap_i64: → bvchop 32 (truncate to low 32 bits)
 ;; 5. i64.extend_i32_u: → identity (zero-extend preserves value)
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Base theory for i64 instruction proofs
-(defconst *i64-theory*
+(local (defconst *i64-theory*
   '(run execute-instr execute-i64.const
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -23,7 +21,7 @@
     push-operand top-operand pop-operand
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp i32-valp u32p u64p))
+    valp i32-valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: i64.add specification
@@ -49,7 +47,7 @@
             :memory nil
             :globals nil))))
     (make-i64-val (bvplus 64 a b))))
-  :hints (("Goal" :in-theory (enable execute-i64.add . #.*i64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i64.add) *i64-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -77,7 +75,7 @@
             :memory nil
             :globals nil))))
     (make-i64-val (acl2::bvminus 64 a b))))
-  :hints (("Goal" :in-theory (enable execute-i64.sub . #.*i64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i64.sub) *i64-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -105,7 +103,7 @@
             :memory nil
             :globals nil))))
     (make-i64-val (acl2::bvmult 64 a b))))
-  :hints (("Goal" :in-theory (enable execute-i64.mul . #.*i64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i64.mul) *i64-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -131,7 +129,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val (acl2::bvchop 32 x))))
-  :hints (("Goal" :in-theory (enable execute-i32.wrap_i64 . #.*i64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i32.wrap_i64) *i64-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -158,13 +156,13 @@
             :memory nil
             :globals nil))))
     (make-i64-val x)))
-  :hints (("Goal" :in-theory (enable execute-i64.extend_i32_u execute-i32.const
-                                     make-i32-val i32-valp i32-const-argsp . #.*i64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i64.extend_i32_u execute-i32.const
+                                     make-i32-val i32-valp i32-const-argsp) *i64-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~% - i64-add-spec (Q.E.D.)~%")
-(cw " - i64-sub-spec (Q.E.D.)~%")
-(cw " - i64-mul-spec (Q.E.D.)~%")
-(cw " - i32-wrap-i64-spec: truncation (Q.E.D.)~%")
-(cw " - i64-extend-i32-u-spec: zero-extension (Q.E.D.)~%")
+(value-triple (cw "~% - i64-add-spec (Q.E.D.)~%"))
+(value-triple (cw " - i64-sub-spec (Q.E.D.)~%"))
+(value-triple (cw " - i64-mul-spec (Q.E.D.)~%"))
+(value-triple (cw " - i32-wrap-i64-spec: truncation (Q.E.D.)~%"))
+(value-triple (cw " - i64-extend-i32-u-spec: zero-extension (Q.E.D.)~%"))

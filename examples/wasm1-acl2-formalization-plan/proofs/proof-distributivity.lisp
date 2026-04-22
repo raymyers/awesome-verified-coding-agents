@@ -17,13 +17,10 @@
 ;; Relies on: kestrel/bv/rules.lisp for bvmult-of-bvplus-1/2 and bvmult-of-bvminus-1
 ;;            kestrel/bv/bvshl.lisp for bvshl definitions
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 (local (include-book "kestrel/bv/rules" :dir :system))
 
-(set-guard-checking :none)
 
 (local (include-book "arithmetic-5/top" :dir :system))
 
@@ -116,4 +113,4 @@
            (equal (acl2::bvshl 64 x 3) (acl2::bvmult 64 x 8)))
   :hints (("Goal" :in-theory (enable acl2::bvshl acl2::bvmult acl2::bvchop))))
 
-(cw "~%*** proof-distributivity: all theorems proved ***~%")
+(value-triple (cw "~%*** proof-distributivity: all theorems proved ***~%"))

@@ -7,12 +7,9 @@
 ;; All theorems are of the form: ∀ x,y ∈ u32. property(x,y)
 ;; These are proved by ACL2's rewriter + BV library rules.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; State constructor for binary ops: (i32.const a) (i32.const b) (op)
 (defund mk-binop (a b op)
@@ -51,7 +48,7 @@
   (top-operand (current-operand-stack (run n state))))
 
 ;; Common theory
-(defconst *alg-theory*
+(local (defconst *alg-theory*
   '(mk-binop mk-unop result
     run step execute-instr
     execute-i32.const execute-i32.add execute-i32.sub execute-i32.mul
@@ -72,7 +69,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §1. ADDITIVE PROPERTIES
@@ -82,7 +79,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.add))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; add(0, x) = x  (left identity)
@@ -90,7 +87,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop 0 x :i32.add))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; sub(x, 0) = x
@@ -98,7 +95,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.sub))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; sub(x, x) = 0
@@ -106,9 +103,8 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.sub))
                   (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable acl2::bvminus acl2::bvplus
-                                      acl2::bvuminus acl2::bvchop
-                                      . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(acl2::bvminus acl2::bvplus
+                                      acl2::bvuminus acl2::bvchop) *alg-theory*))
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -119,7 +115,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 1 :i32.mul))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; mul(1, x) = x  (left identity)
@@ -127,7 +123,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop 1 x :i32.mul))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; mul(x, 0) = 0  (zero annihilator)
@@ -135,7 +131,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.mul))
                   (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -146,7 +142,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.and))
                   (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; and(x, MAX) = x  (identity with all-ones)
@@ -154,7 +150,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x (1- (expt 2 32)) :i32.and))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; or(x, 0) = x  (identity)
@@ -163,7 +159,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.or))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; or(x, MAX) = MAX  (all-ones absorber)
@@ -171,7 +167,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x (1- (expt 2 32)) :i32.or))
                   (make-i32-val (1- (expt 2 32)))))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; xor(x, 0) = x  (identity)
@@ -179,7 +175,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.xor))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; xor(x, x) = 0  (self-inverse)
@@ -187,7 +183,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.xor))
                   (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -198,7 +194,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.shl))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; shr_u(x, 0) = x  (identity)
@@ -206,7 +202,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.shr_u))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; Lemma: ash(x, -32) = 0 when x fits in 32 bits
@@ -221,7 +217,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x 0 :i32.rotl))
                   (make-i32-val x)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; rotr(x, 0) = x — proved concretely in proof-spec-edge-cases.lisp;
@@ -235,7 +231,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.eq))
                   (make-i32-val 1)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; ne(x, x) = 0  (complement of reflexive)
@@ -243,7 +239,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.ne))
                   (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; le_u(x, x) = 1  (reflexive)
@@ -251,7 +247,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.le_u))
                   (make-i32-val 1)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; ge_u(x, x) = 1  (reflexive)
@@ -259,7 +255,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.ge_u))
                   (make-i32-val 1)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; lt_u(x, x) = 0  (irreflexive)
@@ -267,7 +263,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.lt_u))
                   (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; gt_u(x, x) = 0  (irreflexive)
@@ -275,7 +271,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.gt_u))
                   (make-i32-val 0)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; le_s(x, x) = 1  (reflexive, signed)
@@ -283,7 +279,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.le_s))
                   (make-i32-val 1)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; ge_s(x, x) = 1  (reflexive, signed)
@@ -291,7 +287,7 @@
   (implies (u32p x)
            (equal (result 3 (mk-binop x x :i32.ge_s))
                   (make-i32-val 1)))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -301,14 +297,14 @@
 (defthm i32-eqz-zero-is-true
   (equal (result 2 (mk-unop 0 :i32.eqz))
          (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; eqz(1) = 0
 (defthm i32-eqz-one-is-false
   (equal (result 2 (mk-unop 1 :i32.eqz))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*alg-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *alg-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; All done.

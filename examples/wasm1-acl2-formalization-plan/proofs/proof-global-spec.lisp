@@ -4,12 +4,10 @@
 ;; 1. global.set → global.get roundtrip on mutable globals
 ;; 2. global.set on immutable (const) global traps
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *global-theory*
+(local (defconst *global-theory*
   '(run execute-instr execute-i32.const
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -20,7 +18,7 @@
     push-operand top-operand pop-operand
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp i64-valp u32p u64p))
+    valp i64-valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: Mutable global set/get roundtrip
@@ -47,7 +45,7 @@
             :globals (list (make-globalinst :mutability :var
                                            :value (make-i32-val 0)))))))
     (make-i32-val v)))
-  :hints (("Goal" :in-theory (enable . #.*global-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *global-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -70,9 +68,9 @@
          :globals (list (make-globalinst :mutability :const
                                         :value (make-i32-val 0)))))
    :trap)
-  :hints (("Goal" :in-theory (enable . #.*global-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *global-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~% - global-set-get-roundtrip: mutable global round-trip (Q.E.D.)~%")
-(cw " - global-set-const-traps: immutable global mutation traps (Q.E.D.)~%")
+(value-triple (cw "~% - global-set-get-roundtrip: mutable global round-trip (Q.E.D.)~%"))
+(value-triple (cw " - global-set-const-traps: immutable global mutation traps (Q.E.D.)~%"))

@@ -7,10 +7,8 @@
 ;; This demonstrates: (1) the ACL2 proof approach works on our model,
 ;; (2) instruction composition is correct, (3) BV library integration.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: i32.add specification
@@ -20,7 +18,7 @@
 ;; on top of the operand stack.
 
 ;; Helper: the common theory for unfolding WASM execution
-(defconst *wasm-exec-theory*
+(local (defconst *wasm-exec-theory*
   '(run execute-instr execute-i32.const execute-i32.add
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -30,7 +28,7 @@
     push-operand top-operand pop-operand top-n-operands
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack
-    call-stackp valp i64-valp u32p u64p))
+    call-stackp valp i64-valp u32p u64p)))
 
 (defthm i32-add-spec
   (implies
@@ -134,6 +132,6 @@
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~%All proofs passed!~%")
-(cw "  - i32-add-spec: instruction sequence specification~%")
-(cw "  - i32-add-commutative: WASM-level commutativity~%")
+(value-triple (cw "~%All proofs passed!~%"))
+(value-triple (cw "  - i32-add-spec: instruction sequence specification~%"))
+(value-triple (cw "  - i32-add-commutative: WASM-level commutativity~%"))

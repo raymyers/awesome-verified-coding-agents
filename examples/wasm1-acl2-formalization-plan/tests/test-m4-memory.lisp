@@ -1,7 +1,5 @@
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Helper: extract result from state or (:done state) — reusable
 (defun get-result (r)
@@ -36,7 +34,7 @@
     (equal (get-result (run-wasm-mem ,steps ,locals ,instrs ,mem))
            ,expected)))
 
-(defconst *test-mem* (list 0 0 0 0 42 0 0 0 1 0 1 0 255 255 255 255))
+(local (defconst *test-mem* (list 0 0 0 0 42 0 0 0 1 0 1 0 255 255 255 255)))
 
 ;; Test M4.1: i32.load from addr 4 → 42
 (check-mem-result 10 nil '((:i32.const 4) (:i32.load 0)) *test-mem* (make-i32-val 42))
@@ -76,4 +74,4 @@
         (equal (nth 2 (state->memory st)) #x34)
         (equal (nth 3 (state->memory st)) #x12))))
 
-(cw "~%All M4 tests passed! (memory load/store/size/LE)~%")
+(value-triple (cw "~%All M4 tests passed! (memory load/store/size/LE)~%"))

@@ -10,12 +10,9 @@
 ;; to the full WASM execution model, establishing that the formalization
 ;; respects the algebraic symmetry guaranteed by the WASM 1.0 spec.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; ─── Re-use helpers from proof-algebraic-properties.lisp ─────────────────────
 ;;     (duplicated here so this file loads standalone)
@@ -60,7 +57,7 @@
 
 ;; ─── Shared theory constants ──────────────────────────────────────────────────
 
-(defconst *cm32-theory*
+(local (defconst *cm32-theory*
   '(cm-binop32 cm-result32
     run step execute-instr
     execute-i32.const execute-i32.add execute-i32.mul
@@ -74,9 +71,9 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
-(defconst *cm64-theory*
+(local (defconst *cm64-theory*
   '(cm-binop64 cm-result64
     run step execute-instr
     execute-i64.const execute-i64.add execute-i64.mul
@@ -90,7 +87,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §1. i32 COMMUTATIVITY
@@ -100,7 +97,7 @@
   (implies (and (u32p a) (u32p b))
            (equal (cm-result32 3 (cm-binop32 a b :i32.add))
                   (cm-result32 3 (cm-binop32 b a :i32.add))))
-  :hints (("Goal" :in-theory (enable . #.*cm32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.mul(a, b) = i32.mul(b, a)
@@ -108,7 +105,7 @@
   (implies (and (u32p a) (u32p b))
            (equal (cm-result32 3 (cm-binop32 a b :i32.mul))
                   (cm-result32 3 (cm-binop32 b a :i32.mul))))
-  :hints (("Goal" :in-theory (enable . #.*cm32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.and(a, b) = i32.and(b, a)
@@ -116,7 +113,7 @@
   (implies (and (u32p a) (u32p b))
            (equal (cm-result32 3 (cm-binop32 a b :i32.and))
                   (cm-result32 3 (cm-binop32 b a :i32.and))))
-  :hints (("Goal" :in-theory (enable . #.*cm32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.or(a, b) = i32.or(b, a)
@@ -124,7 +121,7 @@
   (implies (and (u32p a) (u32p b))
            (equal (cm-result32 3 (cm-binop32 a b :i32.or))
                   (cm-result32 3 (cm-binop32 b a :i32.or))))
-  :hints (("Goal" :in-theory (enable . #.*cm32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.xor(a, b) = i32.xor(b, a)
@@ -132,7 +129,7 @@
   (implies (and (u32p a) (u32p b))
            (equal (cm-result32 3 (cm-binop32 a b :i32.xor))
                   (cm-result32 3 (cm-binop32 b a :i32.xor))))
-  :hints (("Goal" :in-theory (enable . #.*cm32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -143,7 +140,7 @@
   (implies (and (u64p a) (u64p b))
            (equal (cm-result64 3 (cm-binop64 a b :i64.add))
                   (cm-result64 3 (cm-binop64 b a :i64.add))))
-  :hints (("Goal" :in-theory (enable . #.*cm64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.mul(a, b) = i64.mul(b, a)
@@ -151,7 +148,7 @@
   (implies (and (u64p a) (u64p b))
            (equal (cm-result64 3 (cm-binop64 a b :i64.mul))
                   (cm-result64 3 (cm-binop64 b a :i64.mul))))
-  :hints (("Goal" :in-theory (enable . #.*cm64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.and(a, b) = i64.and(b, a)
@@ -159,7 +156,7 @@
   (implies (and (u64p a) (u64p b))
            (equal (cm-result64 3 (cm-binop64 a b :i64.and))
                   (cm-result64 3 (cm-binop64 b a :i64.and))))
-  :hints (("Goal" :in-theory (enable . #.*cm64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.or(a, b) = i64.or(b, a)
@@ -167,7 +164,7 @@
   (implies (and (u64p a) (u64p b))
            (equal (cm-result64 3 (cm-binop64 a b :i64.or))
                   (cm-result64 3 (cm-binop64 b a :i64.or))))
-  :hints (("Goal" :in-theory (enable . #.*cm64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.xor(a, b) = i64.xor(b, a)
@@ -175,5 +172,5 @@
   (implies (and (u64p a) (u64p b))
            (equal (cm-result64 3 (cm-binop64 a b :i64.xor))
                   (cm-result64 3 (cm-binop64 b a :i64.xor))))
-  :hints (("Goal" :in-theory (enable . #.*cm64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *cm64-theory*)
                   :expand ((:free (n s) (run n s))))))

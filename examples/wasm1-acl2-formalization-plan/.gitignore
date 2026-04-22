@@ -1,0 +1,15 @@
+# ACL2 / cert.pl build artifacts
+*.cert
+*.cert.out
+*.cert.time
+*.port
+*.fasl
+*.lx64fsl
+*.lx86cl64fsl
+*.dx64fsl
+*.pcert0
+*.pcert1
+Makefile-tmp
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/

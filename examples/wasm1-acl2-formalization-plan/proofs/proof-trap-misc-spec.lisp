@@ -6,12 +6,10 @@
 ;; 3. unreachable: always traps
 ;; 4. nop: is identity (advances instruction pointer only)
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(defconst *misc-theory*
+(local (defconst *misc-theory*
   '(run execute-instr execute-i32.const execute-i64.const
     current-frame current-instrs current-operand-stack
     current-label-stack current-locals
@@ -22,7 +20,7 @@
     push-operand top-operand pop-operand
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: Sign extension preserves positive values
@@ -49,7 +47,7 @@
             :memory nil
             :globals nil))))
     (make-i64-val x)))
-  :hints (("Goal" :in-theory (enable execute-i64.extend_i32_s . #.*misc-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i64.extend_i32_s) *misc-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -75,7 +73,7 @@
           :memory nil
           :globals nil))
     :trap))
-  :hints (("Goal" :in-theory (enable execute-i32.div_u . #.*misc-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-i32.div_u) *misc-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -129,11 +127,11 @@
             :memory nil
             :globals nil))))
     (make-i32-val v)))
-  :hints (("Goal" :in-theory (enable execute-nop . #.*misc-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) (append '(execute-nop) *misc-theory*))
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~% - i64-extend-i32-s-positive: sign-ext preserves positive (Q.E.D.)~%")
-(cw " - i32-div-by-zero-traps: div by 0 → :trap (Q.E.D.)~%")
-(cw " - unreachable-traps: always traps (Q.E.D.)~%")
-(cw " - nop-advances-only: nop is identity (Q.E.D.)~%")
+(value-triple (cw "~% - i64-extend-i32-s-positive: sign-ext preserves positive (Q.E.D.)~%"))
+(value-triple (cw " - i32-div-by-zero-traps: div by 0 → :trap (Q.E.D.)~%"))
+(value-triple (cw " - unreachable-traps: always traps (Q.E.D.)~%"))
+(value-triple (cw " - nop-advances-only: nop is identity (Q.E.D.)~%"))

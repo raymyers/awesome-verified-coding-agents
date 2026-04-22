@@ -13,12 +13,9 @@
 ;; (bvplus-associative, bvand-associative, etc.) to the full WASM
 ;; execution model, for both i32 and i64.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; ─── State constructors ───────────────────────────────────────────────────────
 
@@ -104,7 +101,7 @@
 
 ;; ─── Theory constants ─────────────────────────────────────────────────────────
 
-(defconst *as32-theory*
+(local (defconst *as32-theory*
   '(mk-left-assoc32 mk-right-assoc32 as-result32
     run step execute-instr
     execute-i32.const execute-i32.add execute-i32.mul
@@ -118,9 +115,9 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
-(defconst *as64-theory*
+(local (defconst *as64-theory*
   '(mk-left-assoc64 mk-right-assoc64 as-result64
     run step execute-instr
     execute-i64.const execute-i64.add execute-i64.mul
@@ -134,7 +131,7 @@
     push-operand top-operand pop-operand top-n-operands push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §1. i32 ASSOCIATIVITY
@@ -144,7 +141,7 @@
   (implies (and (u32p a) (u32p b) (u32p c))
            (equal (as-result32 5 (mk-left-assoc32 a b c :i32.add))
                   (as-result32 5 (mk-right-assoc32 a b c :i32.add))))
-  :hints (("Goal" :in-theory (enable . #.*as32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.mul: (a*b)*c = a*(b*c)
@@ -152,7 +149,7 @@
   (implies (and (u32p a) (u32p b) (u32p c))
            (equal (as-result32 5 (mk-left-assoc32 a b c :i32.mul))
                   (as-result32 5 (mk-right-assoc32 a b c :i32.mul))))
-  :hints (("Goal" :in-theory (enable . #.*as32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.and: (a&b)&c = a&(b&c)
@@ -160,7 +157,7 @@
   (implies (and (u32p a) (u32p b) (u32p c))
            (equal (as-result32 5 (mk-left-assoc32 a b c :i32.and))
                   (as-result32 5 (mk-right-assoc32 a b c :i32.and))))
-  :hints (("Goal" :in-theory (enable . #.*as32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.or: (a|b)|c = a|(b|c)
@@ -168,7 +165,7 @@
   (implies (and (u32p a) (u32p b) (u32p c))
            (equal (as-result32 5 (mk-left-assoc32 a b c :i32.or))
                   (as-result32 5 (mk-right-assoc32 a b c :i32.or))))
-  :hints (("Goal" :in-theory (enable . #.*as32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i32.xor: (a^b)^c = a^(b^c)
@@ -176,7 +173,7 @@
   (implies (and (u32p a) (u32p b) (u32p c))
            (equal (as-result32 5 (mk-left-assoc32 a b c :i32.xor))
                   (as-result32 5 (mk-right-assoc32 a b c :i32.xor))))
-  :hints (("Goal" :in-theory (enable . #.*as32-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as32-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -187,7 +184,7 @@
   (implies (and (u64p a) (u64p b) (u64p c))
            (equal (as-result64 5 (mk-left-assoc64 a b c :i64.add))
                   (as-result64 5 (mk-right-assoc64 a b c :i64.add))))
-  :hints (("Goal" :in-theory (enable . #.*as64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.mul: (a*b)*c = a*(b*c)
@@ -195,7 +192,7 @@
   (implies (and (u64p a) (u64p b) (u64p c))
            (equal (as-result64 5 (mk-left-assoc64 a b c :i64.mul))
                   (as-result64 5 (mk-right-assoc64 a b c :i64.mul))))
-  :hints (("Goal" :in-theory (enable . #.*as64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.and: (a&b)&c = a&(b&c)
@@ -203,7 +200,7 @@
   (implies (and (u64p a) (u64p b) (u64p c))
            (equal (as-result64 5 (mk-left-assoc64 a b c :i64.and))
                   (as-result64 5 (mk-right-assoc64 a b c :i64.and))))
-  :hints (("Goal" :in-theory (enable . #.*as64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.or: (a|b)|c = a|(b|c)
@@ -211,7 +208,7 @@
   (implies (and (u64p a) (u64p b) (u64p c))
            (equal (as-result64 5 (mk-left-assoc64 a b c :i64.or))
                   (as-result64 5 (mk-right-assoc64 a b c :i64.or))))
-  :hints (("Goal" :in-theory (enable . #.*as64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as64-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; i64.xor: (a^b)^c = a^(b^c)
@@ -219,5 +216,5 @@
   (implies (and (u64p a) (u64p b) (u64p c))
            (equal (as-result64 5 (mk-left-assoc64 a b c :i64.xor))
                   (as-result64 5 (mk-right-assoc64 a b c :i64.xor))))
-  :hints (("Goal" :in-theory (enable . #.*as64-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *as64-theory*)
                   :expand ((:free (n s) (run n s))))))

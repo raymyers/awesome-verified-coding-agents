@@ -1,7 +1,5 @@
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Helper: extract result from run output
 (defun get-result (r)
@@ -136,4 +134,4 @@
                                                           :value (make-i64-val 0))))))
         (make-i64-val 9999999999)))
 
-(cw "~%All globals tests passed! (get/set/const-trap/bounds/loop-counter/i64)~%")
+(value-triple (cw "~%All globals tests passed! (get/set/const-trap/bounds/loop-counter/i64)~%"))

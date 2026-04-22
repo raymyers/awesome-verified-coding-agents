@@ -5,11 +5,9 @@
 ;; 2. Well-typed constant instruction produces correct type
 ;; 3. Invalid local.get (out of bounds) rejects at validation time
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
-(ld "/workspace/project/awesome-verified-coding-agents/examples/wasm1-acl2-formalization-plan/validation.lisp")
+(include-book "../execution")
+(include-book "../validation")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: The type checker correctly types i32 addition
@@ -90,8 +88,8 @@
                                      ctx-mems ctx-tables ctx-types ctx-funcs
                                      ctx-push-label))))
 
-(cw "~% - tc-i32-add-correct: well-typed add produces :i32 (Q.E.D.)~%")
-(cw " - tc-rejects-add-type-mismatch: type mismatch → :invalid (Q.E.D.)~%")
-(cw " - tc-rejects-local-get-oob: out of bounds → :invalid (Q.E.D.)~%")
-(cw " - tc-rejects-immutable-global-set: immutable → :invalid (Q.E.D.)~%")
-(cw " - tc-abs-body-valid: abs() function validates (Q.E.D.)~%")
+(value-triple (cw "~% - tc-i32-add-correct: well-typed add produces :i32 (Q.E.D.)~%"))
+(value-triple (cw " - tc-rejects-add-type-mismatch: type mismatch → :invalid (Q.E.D.)~%"))
+(value-triple (cw " - tc-rejects-local-get-oob: out of bounds → :invalid (Q.E.D.)~%"))
+(value-triple (cw " - tc-rejects-immutable-global-set: immutable → :invalid (Q.E.D.)~%"))
+(value-triple (cw " - tc-abs-body-valid: abs() function validates (Q.E.D.)~%"))

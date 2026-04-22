@@ -5,14 +5,12 @@
 ;; 2. local.tee preserves value on stack (and stores it)
 ;; 3. drop removes top of stack, exposing second value
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Theory for local variable proofs
 ;; Note: execute-local.set, execute-local.tee are defun (auto-enabled)
-(defconst *local-theory*
+(local (defconst *local-theory*
   '(run execute-instr
     execute-local.get execute-i32.const
     current-frame current-instrs current-operand-stack
@@ -26,7 +24,7 @@
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
     valp i64-valp u32p u64p
-    nth-local update-nth-local))
+    nth-local update-nth-local)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Theorem 1: local.set → local.get roundtrip
@@ -52,7 +50,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val v)))
-  :hints (("Goal" :in-theory (enable . #.*local-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *local-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -79,7 +77,7 @@
             :memory nil
             :globals nil))))
     (make-i32-val v)))
-  :hints (("Goal" :in-theory (enable . #.*local-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *local-theory*)
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
@@ -121,6 +119,6 @@
                   :do-not '(generalize)
                   :expand ((:free (n s) (run n s))))))
 
-(cw "~% - local-set-get-roundtrip: local.set→local.get (Q.E.D.)~%")
-(cw " - local-tee-preserves-value: local.tee keeps stack val (Q.E.D.)~%")
-(cw " - drop-removes-top: drop pops value (Q.E.D.)~%")
+(value-triple (cw "~% - local-set-get-roundtrip: local.set→local.get (Q.E.D.)~%"))
+(value-triple (cw " - local-tee-preserves-value: local.tee keeps stack val (Q.E.D.)~%"))
+(value-triple (cw " - drop-removes-top: drop pops value (Q.E.D.)~%"))

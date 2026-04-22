@@ -10,10 +10,8 @@
 ;;   f64.nearest, f32.trunc, f64.trunc, f32.load, f64.load,
 ;;   f32.store, f64.store
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 (include-book "kestrel/floats/ieee-floats-as-bvs" :dir :system)
 (include-book "kestrel/floats/round" :dir :system)
 
@@ -21,7 +19,6 @@
 ;; f32.reinterpret_i32 and i32.reinterpret_f32 are now defined in execution.lisp.
 ;; These tests exercise them via direct function calls.
 
-(set-guard-checking :none)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tests: decode-bv-float32 directly

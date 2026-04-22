@@ -8,12 +8,9 @@
 ;; (:f32.const 0).  neg((:f32.const 0)) = :f32.-0  (positive zero negated
 ;; gives the negative zero atom).  Comparisons treat both as rational 0.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
-(set-guard-checking :none)
 
 ;; ─── State helpers ────────────────────────────────────────────────────────────
 (defund sz-state (instrs)
@@ -31,7 +28,7 @@
   (declare (xargs :guard t :verify-guards nil))
   (top-operand (current-operand-stack (run n (sz-state instrs)))))
 
-(defconst *sz-theory*
+(local (defconst *sz-theory*
   '(sz-state sz-top
     run step execute-instr
     execute-f32.const execute-f32.neg execute-f32.abs execute-f32.copysign
@@ -46,7 +43,7 @@
     push-operand top-operand pop-operand push-vals
     operand-stack-height empty-operand-stack operand-stackp
     localsp framep top-frame push-call-stack pop-call-stack call-stackp
-    valp u32p u64p))
+    valp u32p u64p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; §1. NEG SIGNED ZERO
@@ -55,7 +52,7 @@
 (defthm f32-neg-pos-zero-is-neg-zero
   (equal (sz-top 2 (list '(:f32.const 0) '(:f32.neg)))
          :f32.-0)
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; neg(-0) = +0
@@ -89,7 +86,7 @@
 (defthm f32-double-neg-zero-restores-pos
   (equal (sz-top 3 (list '(:f32.const 0) '(:f32.neg) '(:f32.neg)))
          :f32.+0)
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -157,7 +154,7 @@
   (equal (sz-top 4 (list '(:f32.const 0) '(:f32.const 0)
                           '(:f32.neg) '(:f32.eq)))
          (make-i32-val 1))
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; f32.ne(+0, -0) = 0  (they are equal, not different)
@@ -165,7 +162,7 @@
   (equal (sz-top 4 (list '(:f32.const 0) '(:f32.const 0)
                           '(:f32.neg) '(:f32.ne)))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; f32.lt(+0, -0) = 0  (neither is strictly less)
@@ -173,7 +170,7 @@
   (equal (sz-top 4 (list '(:f32.const 0) '(:f32.const 0)
                           '(:f32.neg) '(:f32.lt)))
          (make-i32-val 0))
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -183,7 +180,7 @@
 (defthm f32-div-pos-by-pos-zero
   (equal (sz-top 3 (list '(:f32.const 1) '(:f32.const 0) '(:f32.div)))
          :f32.+inf)
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; pos / -0 = -Inf
@@ -191,7 +188,7 @@
   (equal (sz-top 4 (list '(:f32.const 1) '(:f32.const 0)
                           '(:f32.neg) '(:f32.div)))
          :f32.-inf)
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))
 
 ;; neg / -0 = +Inf  (sign flip for negative numerator)
@@ -199,5 +196,5 @@
   (equal (sz-top 4 (list '(:f32.const -1) '(:f32.const 0)
                           '(:f32.neg) '(:f32.div)))
          :f32.+inf)
-  :hints (("Goal" :in-theory (enable . #.*sz-theory*)
+  :hints (("Goal" :in-theory (union-theories (current-theory :here) *sz-theory*)
                   :expand ((:free (n s) (run n s))))))

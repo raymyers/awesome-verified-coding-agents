@@ -1,7 +1,5 @@
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;; Helper: run a single-frame program with given locals
 (defmacro run-wasm (steps locals instrs)
@@ -125,4 +123,4 @@
               '((:local.get 0) (:local.get 1) (:i32.shr_u))
               (make-i32-val 16))
 
-(cw "~%All M1 tests passed!~%")
+(value-triple (cw "~%All M1 tests passed!~%"))

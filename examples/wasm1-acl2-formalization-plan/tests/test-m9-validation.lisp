@@ -3,10 +3,9 @@
 ;; Tests for the type checker defined in validation.lisp.
 ;; Verifies that valid programs pass and invalid programs are rejected.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(ld "/workspace/project/awesome-verified-coding-agents/examples/wasm1-acl2-formalization-plan/validation.lisp")
+(include-book "../execution")
+(include-book "../validation")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helper: check that a sequence type-checks to expected stack result
@@ -74,7 +73,7 @@
 (check-invalid "i32.wrap_wrong-type" *empty-ctx*
                '((:i32.const 0) (:i32.wrap_i64)))
 
-(cw "~%9.1 Numeric instruction typing: all pass~%")
+(value-triple (cw "~%9.1 Numeric instruction typing: all pass~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 9.2 Variable instruction typing
@@ -105,7 +104,7 @@
 ;; global.set (immutable) should fail
 (check-invalid "global.set-const" *var-ctx* '((:f64.const 1) (:global.set 1)))
 
-(cw "9.2 Variable instruction typing: all pass~%")
+(value-triple (cw "9.2 Variable instruction typing: all pass~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 9.3 Parametric instruction typing
@@ -124,7 +123,7 @@
 (check-valid "nop" *empty-ctx* '((:nop)) nil)
 (check-valid "nop-preserves" *empty-ctx* '((:i32.const 1) (:nop)) '(:i32))
 
-(cw "9.3 Parametric instruction typing: all pass~%")
+(value-triple (cw "9.3 Parametric instruction typing: all pass~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 9.4 Control flow typing
@@ -184,7 +183,7 @@
 (check-valid "return" *func-ctx*
              '((:i32.const 42) (:return)) '(:polymorphic))
 
-(cw "9.4 Control flow typing: all pass~%")
+(value-triple (cw "9.4 Control flow typing: all pass~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 9.5 Memory instruction typing
@@ -206,7 +205,7 @@
 ;; Load type mismatch (address must be i32)
 (check-invalid "load-wrong-addr" *mem-ctx* '((:i64.const 0) (:i32.load)))
 
-(cw "9.5 Memory instruction typing: all pass~%")
+(value-triple (cw "9.5 Memory instruction typing: all pass~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 9.6 Function call typing
@@ -234,7 +233,7 @@
                (make-ctx '(((:i32) . (:i32))) nil nil nil nil nil 0 0)
                '((:i32.const 5) (:i32.const 0) (:call_indirect 0)))
 
-(cw "9.6 Function call typing: all pass~%")
+(value-triple (cw "9.6 Function call typing: all pass~%"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 9.7 Composite program validation
@@ -282,6 +281,6 @@
                           '((:i64.const 5) (:local.set 0) (:local.get 0))))
  :msg "FAIL: wrong-local-type should be invalid")
 
-(cw "9.7 Composite program validation: all pass~%")
+(value-triple (cw "9.7 Composite program validation: all pass~%"))
 
-(cw "~%=== ALL M9 VALIDATION TESTS PASSED ===~%")
+(value-triple (cw "~%=== ALL M9 VALIDATION TESTS PASSED ===~%"))

@@ -1,0 +1,8 @@
+; cert.pl certification commands applied to every .lisp book in this
+; directory that does not have its own <book>.acl2 file.
+;
+; We pull in the WASM package from the Kestrel community book
+; (books/kestrel/wasm/portcullis). Including that book makes the WASM
+; package known so all books here can start with (in-package "WASM").
+
+(include-book "kestrel/wasm/portcullis" :dir :system)

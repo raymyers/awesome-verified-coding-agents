@@ -8,10 +8,8 @@
 ;;
 ;; Key technique: encapsulate scopes arithmetic-5 to avoid theory pollution.
 
-(in-package "ACL2")
-(ld "/tmp/acl2-full/books/kestrel/wasm/package.lsp")
 (in-package "WASM")
-(include-book "kestrel/wasm/execution" :dir :system)
+(include-book "../execution")
 
 ;;; Theorem 1: LE bytes roundtrip
 ;;; (le-bytes-to-u32 (u32-to-le-bytes x)) = x for u32 x
@@ -76,7 +74,7 @@
                                mem-read-bytes mem-write-bytes
                                le-bytes-roundtrip mem-read-write-4))))
 
-(cw "~%=== ALL MEMORY ROUNDTRIP PROOFS PASSED ===~%")
-(cw "  - le-bytes-roundtrip: Q.E.D.~%")
-(cw "  - mem-read-write-4: Q.E.D.~%")
-(cw "  - i32-store-load-semantic-roundtrip: Q.E.D.~%")
+(value-triple (cw "~%=== ALL MEMORY ROUNDTRIP PROOFS PASSED ===~%"))
+(value-triple (cw "  - le-bytes-roundtrip: Q.E.D.~%"))
+(value-triple (cw "  - mem-read-write-4: Q.E.D.~%"))
+(value-triple (cw "  - i32-store-load-semantic-roundtrip: Q.E.D.~%"))

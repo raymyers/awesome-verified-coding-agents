@@ -60,31 +60,33 @@
 
 **Goal**: Headless agent can build ACL2, certify existing books, run tests.
 
-- [x] Install SBCL (`sudo apt-get install -y sbcl`)
-- [x] Clone ACL2 (`git clone --depth 1 https://github.com/acl2/acl2.git /tmp/acl2-full`)
-- [x] Build ACL2 (`cd /tmp/acl2-full && make LISP=sbcl`) — ~3 minutes
-- [x] Set `ACL2=/tmp/acl2-full/saved_acl2`
-- [x] Certify Kestrel WASM skeleton:
+- [x] Install SBCL (`sudo apt-get install -y sbcl`) — already done in the dev container
+- [x] ACL2 available at `/opt/acl2/bin/acl2` (dev container) or `$HOME/acl2/saved_acl2` (manual build)
+- [x] Community books at `/home/acl2/books` (dev container), with `cert.pl` at `/home/acl2/books/build/cert.pl`
+- [x] Certify the WASM tree in this directory:
   ```bash
-  cd /tmp/acl2-full
-  books/build/cert.pl --acl2 ./saved_acl2 books/kestrel/wasm/execution
+  make        # uses Makefile defaults: ACL2=/opt/acl2/bin/acl2, CERT=/home/acl2/books/build/cert.pl
   ```
-  **CRITICAL**: Use `cert.pl`, NOT `make -C books/kestrel/wasm` (no Makefile in that dir).
+  Override with `make ACL2=... CERT=...` when running outside the dev container.
+  **NOTE**: `cert.acl2` in each subdir includes `kestrel/wasm/portcullis` so the `WASM` package is available to every book. No local package.lsp.
 - [x] Clone WASM spec: `git clone --depth 1 --sparse https://github.com/WebAssembly/spec.git && cd spec && git sparse-checkout set specification/wasm-1.0`
 - [x] Verify test pattern: `assert-event` with `run 4` add-program produces `(make-i32-val 7)`
 
-### Bootstrap Script (copy-paste for new sessions)
+### Bootstrap Script (for use outside the dev container)
 ```bash
 #!/bin/bash
-# setup-wasm-acl2.sh — Run at start of each agent session
+# setup-wasm-acl2.sh — only needed outside the provided dev container.
+# The dev container already has ACL2 at /opt/acl2/bin/acl2 and the community
+# books at /home/acl2/books — no bootstrap needed there.
 which sbcl || sudo apt-get install -y sbcl
-if [ ! -f /tmp/acl2-full/saved_acl2 ]; then
-  git clone --depth 1 https://github.com/acl2/acl2.git /tmp/acl2-full
-  cd /tmp/acl2-full && make LISP=sbcl
+if [ ! -f $HOME/acl2/saved_acl2 ]; then
+  git clone --depth 1 https://github.com/acl2/acl2.git $HOME/acl2
+  cd $HOME/acl2 && make LISP=sbcl
 fi
-export ACL2=/tmp/acl2-full/saved_acl2
-# Certify skeleton
-cd /tmp/acl2-full && books/build/cert.pl --acl2 $ACL2 books/kestrel/wasm/execution
+export ACL2=$HOME/acl2/saved_acl2
+export CERT=$HOME/acl2/books/build/cert.pl
+# Certify the WASM tree
+cd examples/wasm1-acl2-formalization-plan && make
 # Verify
 echo '(+ 40 2) (quit)' | $ACL2
 ```
@@ -299,7 +301,7 @@ WAT source → wat2wasm → .wasm binary → wasm2acl2.js → ACL2 S-exprs → A
 ### Key E2E Lessons Learned
 1. **Negative args → unsigned**: JS `args[i] >>> 0` for i32, `BigInt(x) + (1n << 64n)` for i64
 2. **Memory instructions need offset**: `(:i32.load offset)` not `(:i32.load)`; extract from memarg
-3. **Package/include-book**: Our execution.lisp needs its own `package.lsp` + `portcullis.lisp` to certify independently (copied from Kestrel); use `include-book` of our certified `.cert`, not Kestrel's skeleton
+3. **Package/include-book**: The `WASM` package is loaded once, via each dir's `cert.acl2` which does `(include-book "kestrel/wasm/portcullis" :dir :system)`. Test / proof books `(include-book "../execution")` — no local `package.lsp`.
 4. **validation.lisp must also reference our execution** (not Kestrel's), otherwise `storep` redefines
 
 ### E2E Pipeline Proof (capstone)
@@ -429,25 +431,21 @@ Universal properties proven by ACL2's theorem prover.
 Currently: 280 Q.E.D.s across 27 proof files + 312 test assertions via `ld`.
 
 ### Level 4: Certification
-Book certification ensures soundness. Use `cert.pl`:
+Every `.lisp` book in this tree certifies via `cert.pl`, driven by the top-level
+`Makefile`. `cert.acl2` files in `./`, `proofs/`, and `tests/` pull in the `WASM`
+package from `kestrel/wasm/portcullis`; no per-book `.acl2` file is required.
 ```bash
-cd /tmp/acl2-full
-books/build/cert.pl --acl2 ./saved_acl2 path/to/book
+make                   # certify 45/45 books
+make proofs            # just proofs/
+make tests             # just tests/
 ```
 
-### Level 5: Regression Script
+### Level 5: Regression
+`make` IS the regression script. A clean `make clean && make` run exits 0 iff
+every book certifies. For single-book debugging:
 ```bash
-# Run all tests and proofs
-PASS=0; FAIL=0
-for f in tests/*.lisp proofs/*.lisp; do
-  result=$(echo "(ld \"$f\") (quit)" | $ACL2 2>&1)
-  if echo "$result" | grep -q "FAILED\|ACL2 Error"; then
-    echo "FAIL: $f"; FAIL=$((FAIL+1))
-  else
-    echo "OK: $f"; PASS=$((PASS+1))
-  fi
-done
-echo "=== $PASS passed, $FAIL failed ==="
+$CERT --acl2 $ACL2 proofs/proof-add-spec
+cat proofs/proof-add-spec.cert.out
 ```
 
 ### Test Programs (in order of complexity)
@@ -478,16 +476,17 @@ echo "=== $PASS passed, $FAIL failed ==="
 ### Session Setup Script
 ```bash
 #!/bin/bash
-# setup-wasm-acl2.sh — Run at start of each agent session
+# In the provided dev container ACL2 is already installed:
+#   ACL2=/opt/acl2/bin/acl2       (launcher, also on $PATH as `acl2`)
+#   ACL2_SYSTEM_BOOKS=/home/acl2/books
+# so no bootstrap is required. The snippet below handles a standalone box.
 which sbcl || sudo apt-get install -y sbcl
-if [ ! -f /tmp/acl2-full/saved_acl2 ]; then
-  git clone --depth 1 https://github.com/acl2/acl2.git /tmp/acl2-full
-  cd /tmp/acl2-full && make LISP=sbcl
+if [ ! -f $HOME/acl2/saved_acl2 ]; then
+  git clone --depth 1 https://github.com/acl2/acl2.git $HOME/acl2
+  cd $HOME/acl2 && make LISP=sbcl
 fi
-export ACL2=/tmp/acl2-full/saved_acl2
-
-# Certify skeleton (needed for include-book of Kestrel libs)
-cd /tmp/acl2-full && books/build/cert.pl --acl2 $ACL2 books/kestrel/wasm/execution
+export ACL2=${ACL2:-$HOME/acl2/saved_acl2}
+export CERT=${CERT:-$HOME/acl2/books/build/cert.pl}
 
 # For E2E pipeline
 which wat2wasm || sudo apt-get install -y wabt
@@ -504,44 +503,54 @@ echo '(+ 40 2) (quit)' | $ACL2  # Verify: should print 42
 
 ### Development Workflow
 ```bash
-# Certify our execution.lisp independently (needs package.lsp + portcullis.lisp in same dir)
-cd /tmp/acl2-full && books/build/cert.pl --acl2 ./saved_acl2 /path/to/our/execution
+# From this directory, with Makefile defaults (dev container):
+make                                                   # ACL2=/opt/acl2/bin/acl2, CERT=/home/acl2/books/build/cert.pl
 
-# Run a test
-echo '(ld "/path/to/test.lisp") (quit)' | $ACL2
+# Override if you've built ACL2 yourself:
+make ACL2=$HOME/acl2/saved_acl2 CERT=$HOME/acl2/books/build/cert.pl
+
+# Subsets:
+make top       # just execution + validation + top
+make proofs    # just proofs/*.lisp
+make tests     # just tests/*.lisp
+make clean     # remove .cert / .port / .fasl / .out
+
+# Certify a single book directly:
+$CERT --acl2 $ACL2 proofs/proof-add-spec
 
 # If certification fails, check the log:
-cat /path/to/execution.cert.out
+cat proofs/proof-add-spec.cert.out
 ```
 
-### Common Pitfalls (verified by experience, updated 2026-04-18)
-1. **Use `cert.pl` not `make`**: No Makefile in kestrel/wasm dir; `cert.pl` auto-resolves deps
-2. **Package issues**: Always `(ld "package.lsp")` before `(in-package "WASM")`
-3. **Include-book needs .cert**: Must certify execution.lisp before `(include-book ...)` works
-4. **defaggregate conflict**: WASM `state` shadows ACL2 `state` — handled by package.lsp exclusion
-5. **Stale .cert**: Delete `.cert` + `.cert.out` before re-certifying after edits
-6. **Pipe to ACL2**: Long output → use `grep -E "FAIL|PASSED|Error"` to filter
-7. **Negative WASM values**: JS signed → ACL2 unsigned: use `>>> 0` for i32, `BigInt + 2^64` for i64
-8. **Memory instructions**: Must include memarg offset: `(:i32.load 0)` not `(:i32.load)`
-9. **validation.lisp must reference OUR execution**, not Kestrel's, to avoid `storep` redefinition
-10. **Don't put macros in `:enable` lists**: `advance-instrs`, `ffn-symb` are macros, not functions
-11. **defaggregate `:pred` keyword**: Default generates `name-p`; Kestrel uses `:pred framep`/`:pred statep`
-12. **BV functions need `acl2::` prefix**: Only `bvplus` is imported; `bvminus`,`bvand`,etc need `acl2::`
-13. **Definition order matters**: All handler defs BEFORE `execute-instr` dispatch (single-pass)
-14. **Guard hints pattern**: `(enable valp i32-valp u32p <new-vals-fn>)` for execute fns
-15. **`(set-guard-checking :none)`**: Required in tests when any function has unverified guards
-16. **`execution.acl2` needed**: Outside Kestrel tree, cert.pl requires `(ld "package.lsp")` in `.acl2` file
+### Common Pitfalls (verified by experience, updated 2026-04-22)
+1. **Use `cert.pl` not `make -C`**: No Makefile in community `kestrel/wasm/` dir; `cert.pl` auto-resolves deps
+2. **Single WASM package**: This tree pulls the `WASM` package from `kestrel/wasm/portcullis` via `cert.acl2`. Do NOT redefine `package.lsp` locally
+3. **Book preamble**: Every book here starts with `(in-package "WASM")` followed by `(include-book "execution")` (or `"../execution"` from proofs/tests). The package is already loaded by the portcullis
+4. **No read-time eval (`#.`) inside certified books**: Use `(union-theories (current-theory :here) *foo*)` instead of `(enable . #.*foo*)`
+5. **Top-level forms must be embedded events**: Wrap `(cw ...)` in `(value-triple (cw ...))`; don't put `(set-guard-checking :none)` at top level of a certified book
+6. **`local` theory defconsts**: When several proof/test books share the same defconst name, wrap `(defconst *foo-theory* ...)` in `(local ...)` so they don't collide across the tree
+7. **Stale `.cert`**: `make clean` before re-certifying after edits (or delete specific `.cert`/`.cert.out`)
+8. **Pipe to ACL2**: For one-off `(ld ...)` runs → use `grep -E "FAIL|PASSED|Error"` to filter
+9. **Negative WASM values**: JS signed → ACL2 unsigned: use `>>> 0` for i32, `BigInt + 2^64` for i64
+10. **Memory instructions**: Must include memarg offset: `(:i32.load 0)` not `(:i32.load)`
+11. **Don't put macros in `:enable` lists**: `advance-instrs`, `ffn-symb`, `farg1` are macros, not functions
+12. **defaggregate `:pred` keyword**: Default generates `name-p`; Kestrel uses `:pred framep`/`:pred statep`
+13. **BV functions need `acl2::` prefix**: Only `bvplus` is imported; `bvminus`, `bvand`, etc. need `acl2::`
+14. **Definition order matters**: All handler defs BEFORE `execute-instr` dispatch (single-pass)
+15. **Guard hints pattern**: `(enable valp i32-valp u32p <new-vals-fn>)` for execute fns
+16. **Skip non-book directories**: `tests/oracle/cert_pl_exclude` marker tells `cert.pl` to skip the WAT/JS harness
 17. **See ACL2_SEMANTICS_REF.md §17** for detailed examples of each gotcha
 
 ### File Organization (current)
 ```
 examples/wasm1-acl2-formalization-plan/
-├── package.lsp              # WASM package definition (copied from Kestrel)
-├── portcullis.lisp          # Portcullis book (copied from Kestrel)
-├── portcullis.acl2          # Portcullis commands
-├── execution.lisp           # Main semantics (3168 lines, 170/170 instructions, CERTIFIES)
-├── validation.lisp          # Type checker
+├── cert.acl2               # Portcullis for every book in this dir: (include-book "kestrel/wasm/portcullis" :dir :system)
+├── Makefile                # `make` drives cert.pl over every book
+├── top.lisp                # Library bundle: include-book execution + validation
+├── execution.lisp          # Main semantics (3718 lines, 170/170 instructions)
+├── validation.lisp         # Type checker
 ├── tests/
+│   ├── cert.acl2           # Same one-line portcullis include
 │   ├── test-m1-instructions.lisp
 │   ├── test-m2-control-flow.lisp
 │   ├── test-m3-functions.lisp
@@ -551,32 +560,33 @@ examples/wasm1-acl2-formalization-plan/
 │   ├── test-m7a-floats.lisp
 │   ├── test-m7b-tables.lisp
 │   ├── test-m9-validation.lisp
+│   ├── test-m12-nan.lisp
+│   ├── test-m13-signed-zero.lisp
+│   ├── test-m14-inf-arith.lisp
 │   ├── test-packed-mem.lisp
 │   ├── test-packed-mem-i64.lisp
-│   └── test-spot-check.lisp
+│   ├── test-spot-check.lisp
+│   └── oracle/             # WAT + Node.js oracle harness (excluded via cert_pl_exclude)
+│       ├── cert_pl_exclude
+│       ├── *.wat / *.wasm / *.json
+│       ├── check-all.sh
+│       └── check-all.mjs
 ├── proofs/
+│   ├── cert.acl2           # Same one-line portcullis include
 │   ├── proof-add-spec.lisp
 │   ├── proof-sub-spec.lisp
-│   ├── proof-abs-e2e.lisp
-│   ├── proof-block-br-spec.lisp
-│   ├── proof-loop-spec.lisp
-│   ├── proof-max-if-else.lisp
-│   ├── proof-mem-roundtrip.lisp
-│   ├── proof-bitwise.lisp
-│   ├── proof-validation-soundness.lisp
-│   ├── proof-spec-edge-cases.lisp   # 35 Q.E.D.s: trap, shift, rotate, clz/ctz/popcnt, conversions
-│   ├── proof-m11-float-ops.lisp     # 14 Q.E.D.s: trunc, nearest, copysign (f32+f64)
+│   ├── proof-algebraic-properties.lisp
+│   ├── proof-spec-edge-cases.lisp
+│   ├── proof-m11-float-ops.lisp
 │   ├── proof-ieee754-integration.lisp
-│   └── ... (20 total)
-├── e2e/
-│   ├── wasm2acl2.js         # WASM binary → ACL2 translator
-│   ├── add.wat / add.wasm / add.json
-│   ├── abs.wat / abs.wasm / abs.json
-│   ├── factorial.wat / factorial.wasm / factorial.json
-│   ├── fibonacci.wat / fibonacci.wasm / fibonacci.json
-│   └── memory_store_load.wat / .wasm / .json
+│   ├── proof-nan-propagation.lisp
+│   ├── proof-signed-zero.lisp
+│   ├── proof-distributivity.lisp
+│   └── ... (27 total)
 ├── WASM1_PLAN.md
-└── ACL2_SEMANTICS_REF.md
+├── ACL2_SEMANTICS_REF.md
+├── TEST_GUIDELINES.md
+└── README.md
 ```
 
 ---
@@ -592,7 +602,7 @@ examples/wasm1-acl2-formalization-plan/
 | Parser-executor mismatch | Low | Medium | E2E pipeline catches mismatches | ✅ Resolved |
 | Termination proofs | Medium | Medium | Step-count bounded `run` | ✅ Resolved |
 | /tmp loss between sessions | High | High | Commit early; doc all in AGENTS.md | ⚠️ Active |
-| defaggregate symbol issues | Medium | Medium | Own package.lsp + portcullis; proper include-book | ✅ Resolved |
+| defaggregate symbol issues | Medium | Medium | Single `WASM` package via `kestrel/wasm/portcullis` | ✅ Resolved |
 
 ---
 

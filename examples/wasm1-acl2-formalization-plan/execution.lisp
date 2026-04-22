@@ -12,7 +12,6 @@
 
 ;; STATUS: IN-PROGRESS (WASM 1.0 i32 integer ops, parametric, variable instrs)
 
-(include-book "portcullis") ; for the package
 
 (include-book "std/util/defaggregate" :dir :system)
 (include-book "kestrel/utilities/forms" :dir :system)
