@@ -95,6 +95,7 @@ Each tool an agent uses (file editors, refactoring operations, search) can be in
 | [Provably Correct Vibecoding](https://github.com/GasStationManager/ProvablyCorrectVibeCoding) | Wraps LeanTool for agent-assisted proof development |
 | [LLMLean](https://github.com/cmu-l3/llmlean) | LLM-powered tactic suggestions in Lean |
 | [LeanAide](https://github.com/siddhartha-gadgil/LeanAide) | AI assistance for Lean development |
+| [MartinLoop](https://github.com/Keesan12/martin-loop) | Governance layer for AI coding agents with budget caps, verifier gates, and rollback evidence |
 | [mini-SWE-agent](https://github.com/SWE-agent/mini-swe-agent) | Minimal coding agent (~100 lines); tractable target for verification |
 | [ESBMC agent-marketplace](https://github.com/esbmc/agent-marketplace) | Formal verification for Claude Code: bugs, memory safety, and undefined behavior in C, C++, Python, Solidity, Java/Kotlin via ESBMC bounded model checker |
 
