@@ -132,6 +132,7 @@ See [README.md](./README.md) for curated highlights and project descriptions.
 - [Volcano SDK GitHub repo](https://github.com/Kong/volcano-sdk)
 - [Scaling data collection for training SWE agents](https://nebius.com/blog/posts/scaling-data-collection-for-training-swe-agents)
 - [Prompt engineering: bootstrapping with prompts](https://chip-hennig.medium.com/prompt-engineering-pulling-yourself-up-by-the-bootstraps-fc15c4a44d68)
+- [Derivative: requirement-to-software synthesis with typed requirement preservation, isolated execution, evidence-based validation, bounded repair, and fail-closed packaging](https://github.com/Daniele-Cangi/Derivative)
 
 ### MCP and Agent Protocols
 
